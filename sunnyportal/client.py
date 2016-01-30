@@ -42,13 +42,12 @@ class Client(object):
     def do_request(self, request):
         conn = http.HTTPSConnection(
             self.server, self.port, context=self.create_ssl_context())
-        request.perform(conn)
+        return request.perform(conn)
 
     def get_token(self):
         if self.token is None:
             req = requests.AuthenticationRequest(self.username, self.password)
-            self.do_request(req)
-            self.token = req.get_token()
+            self.token = self.do_request(req)
         return self.token
 
     def logout(self):
@@ -60,4 +59,6 @@ class Client(object):
 
     def get_plants(self):
         req = requests.PlantListRequest(self.get_token())
-        self.do_request(req)
+        res = self.do_request(req)
+        for p in res.plants:
+            self.log.debug("Found plant %s", p["name"])

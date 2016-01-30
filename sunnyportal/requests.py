@@ -15,6 +15,8 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
+from . import responses
+
 from datetime import datetime
 
 import base64
@@ -24,36 +26,9 @@ import http.client as http
 import logging
 import re
 import urllib.parse
-import xml.etree.ElementTree as ET
-
-
-class RequestError(Exception):
-    CODE_TAG = "code"
-    MESSAGE_TAG = "message"
-
-    def __init__(self, tag):
-        super().__init__()
-        code = tag.find(RequestError.CODE_TAG)
-        if code is not None and code.text:
-            self.code = code.text
-        else:
-            self.code = "unknown-error"
-
-        msg = tag.find(RequestError.MESSAGE_TAG)
-        if msg is not None and msg.text:
-            self.msg = msg.text
-        else:
-            self.msg = "Invalid request error"
-
-    def __str__(self):
-        return "%s (%s)" % (self.msg, self.code)
 
 
 class RequestBase(object):
-    ROOT_TAG = "sma.sunnyportal.services"
-    SERVICE_TAG = "service"
-    ERROR_TAG = "error"
-
     def __init__(self, service, token=None, method='GET'):
         super().__init__()
         self.log = logging.getLogger(__name__)
@@ -70,15 +45,15 @@ class RequestBase(object):
 
     def prepare_url(self, path, params={}):
         if self.token is not None:
-            sig = hmac.new(self.token['key'].encode(), digestmod=hashlib.sha1)
+            sig = hmac.new(self.token.key.encode(), digestmod=hashlib.sha1)
             sig.update(self.method.lower().encode())
             sig.update(self.service.lower().encode())
 
-            ts = self.get_timestamp(self.token['server_offset'])
+            ts = self.get_timestamp(self.token.server_offset)
             sig.update(ts.encode())
             params['timestamp'] = ts
 
-            sig.update(self.token['identifier'].lower().encode())
+            sig.update(self.token.identifier.lower().encode())
 
             params['signature-method'] = 'auth'
             params['signature-version'] = self.version
@@ -93,9 +68,6 @@ class RequestBase(object):
     def log_request(self, method, url):
         self.log.debug("%s %s", method, url)
 
-    def log_response(self, data):
-        self.log.debug("Response: %s", data)
-
     def perform(self, connection):
         assert(self.url is not None)
 
@@ -109,25 +81,7 @@ class RequestBase(object):
                     self.service, response.status, response.reason))
 
         data = response.read().decode("utf-8")
-        self.log_response(data)
-
-        root = ET.fromstring(data)
-        if root.tag != RequestBase.ROOT_TAG:
-            raise RuntimeError("Unknown root tag in XML")
-
-        xpath = "./%s[@name='%s']" % (RequestBase.SERVICE_TAG, self.service)
-        tags = root.findall(xpath)
-        if len(tags) != 1:
-            raise RuntimeError("Unexpected number of children in XML")
-
-        error = tags[0].find(RequestBase.ERROR_TAG)
-        if error is not None:
-            raise RequestError(error)
-
-        self.parse_response(tags[0])
-
-    def parse_response(self, tag):
-        pass
+        return self.handle_response(data)
 
 
 class AuthenticationRequest(RequestBase):
@@ -140,27 +94,24 @@ class AuthenticationRequest(RequestBase):
         password = urllib.parse.quote_plus(self.password)
         super().log_request(method, url.replace(password, '<password>'))
 
-    def parse_response(self, tag):
-        d = datetime.strptime(tag.get("creation-date"), "%m/%d/%Y %I:%M:%S %p")
-        self.server_offset = datetime.now() - d
-
-        child = tag.find(self.service)
-        self.identifier = child.get("identifier")
-        self.key = child.get("key")
-
-    def get_token(self):
-        return {'identifier': self.identifier, 'key': self.key,
-                'server_offset': self.server_offset}
+    def handle_response(self, data):
+        return responses.AuthenticationResponse(data)
 
 
 class LogoutRequest(RequestBase):
     def __init__(self, token):
         super().__init__(service='authentication', token=token,
                          method='DELETE')
-        self.prepare_url(token['identifier'])
+        self.prepare_url(token.identifier)
+
+    def handle_response(self, data):
+        return responses.AuthenticationResponse(data)
 
 
 class PlantListRequest(RequestBase):
     def __init__(self, token):
         super().__init__(service='plantlist', token=token)
-        self.prepare_url(token['identifier'])
+        self.prepare_url(token.identifier)
+
+    def handle_response(self, data):
+        return responses.PlantListResponse(data)
