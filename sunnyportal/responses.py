@@ -107,4 +107,25 @@ class PlantListResponse(ResponseBase):
     def parse(self, data):
         self.plants = []
         for p in super().parse(data).findall("plant"):
-            self.plants.append(p.attrib)
+            self.plants.append({
+                'oid': self.get_or_raise(p, 'oid'),
+                'name': self.get_or_raise(p, 'name')
+            })
+
+
+class PlantProfileResponse(ResponseBase):
+    def parse(self, data):
+        tag = super().parse(data)
+        # TODO: parse into something meaningful
+
+
+class LastDataExactResponse(ResponseBase):
+    def parse(self, data):
+        tag = super().parse(data)
+        # TODO: parse into something meaningful
+
+
+class AllDataResponse(ResponseBase):
+    def parse(self, data):
+        tag = super().parse(data)
+        # TODO: parse into something meaningful

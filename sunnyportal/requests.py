@@ -43,7 +43,7 @@ class RequestBase(object):
         timestamp = datetime.now() - offset
         return timestamp.strftime("%Y-%m-%dT%H:%M:%S")
 
-    def prepare_url(self, path, params={}):
+    def prepare_url(self, segments, params={}):
         if self.token is not None:
             sig = hmac.new(self.token.key.encode(), digestmod=hashlib.sha1)
             sig.update(self.method.lower().encode())
@@ -59,9 +59,8 @@ class RequestBase(object):
             params['signature-version'] = self.version
             params['signature'] = base64.standard_b64encode(sig.digest())
 
-        self.url = "%s/%s/%d/%s" % (
-            self.base_path, self.service, self.version,
-            urllib.parse.quote(path))
+        self.url = "%s/%s/%d/" % (self.base_path, self.service, self.version)
+        self.url += "/".join([urllib.parse.quote(s) for s in segments])
         if params:
             self.url += "?%s" % urllib.parse.urlencode(params)
 
@@ -88,7 +87,7 @@ class AuthenticationRequest(RequestBase):
     def __init__(self, username, password):
         super().__init__(service='authentication')
         self.password = password
-        self.prepare_url(username, {'password': password})
+        self.prepare_url([username], {'password': password})
 
     def log_request(self, method, url):
         password = urllib.parse.quote_plus(self.password)
@@ -102,7 +101,7 @@ class LogoutRequest(RequestBase):
     def __init__(self, token):
         super().__init__(service='authentication', token=token,
                          method='DELETE')
-        self.prepare_url(token.identifier)
+        self.prepare_url([token.identifier])
 
     def handle_response(self, data):
         return responses.AuthenticationResponse(data)
@@ -111,7 +110,51 @@ class LogoutRequest(RequestBase):
 class PlantListRequest(RequestBase):
     def __init__(self, token):
         super().__init__(service='plantlist', token=token)
-        self.prepare_url(token.identifier)
+        self.prepare_url([token.identifier])
 
     def handle_response(self, data):
         return responses.PlantListResponse(data)
+
+
+class PlantRequest(RequestBase):
+    def __init__(self, token, oid, view):
+        super().__init__(service='plant', token=token)
+        self.prepare_url([oid], {'view': view, 'culture': 'en-gb',
+                                 'plant-image-size': '64px',
+                                 'identifier': token.identifier})
+
+
+class PlantProfileRequest(PlantRequest):
+    def __init__(self, token, oid):
+        super().__init__(token, oid, 'profile')
+
+    def handle_response(self, data):
+        return responses.PlantProfileResponse(data)
+
+
+class DataRequest(RequestBase):
+    def __init__(self, token, oid, data_type, date, params={}):
+        super().__init__(service='data', token=token)
+        params['culture'] = 'en-gb'
+        params['identifier'] = token.identifier
+        self.prepare_url([oid, data_type, date.strftime("%Y-%m-%d")],
+                         params)
+
+
+class LastDataExactRequest(DataRequest):
+    def __init__(self, token, oid, date):
+        params = {'unit': 'kWh', 'view': 'lastdataexact'}
+        super().__init__(token, oid, 'Energy', date, params)
+
+    def handle_response(self, data):
+        return responses.LastDataExactResponse(data)
+
+
+class AllDataRequest(DataRequest):
+    def __init__(self, token, oid, date, interval='year'):
+        """interval is year or month"""
+        params = {'period': 'infinite', 'interval': interval, 'unit': 'kWh'}
+        super().__init__(token, oid, 'Energy', date, params)
+
+    def handle_response(self, data):
+        return responses.AllDataResponse(data)

@@ -16,6 +16,7 @@
 # USA
 
 from . import requests
+from datetime import date
 
 import http.client as http
 import logging
@@ -60,5 +61,25 @@ class Client(object):
     def get_plants(self):
         req = requests.PlantListRequest(self.get_token())
         res = self.do_request(req)
-        for p in res.plants:
-            self.log.debug("Found plant %s", p["name"])
+        return [Plant(self, p['oid'], p['name']) for p in res.plants]
+
+
+class Plant(object):
+    def __init__(self, client, oid, name):
+        self.client = client
+        self.oid = oid
+        self.name = name
+
+    def profile(self):
+        req = requests.PlantProfileRequest(self.client.get_token(), self.oid)
+        res = self.client.do_request(req)
+
+    def last_data_exact(self):
+        req = requests.LastDataExactRequest(self.client.get_token(), self.oid,
+                                            date.today())
+        res = self.client.do_request(req)
+
+    def all_data(self, interval='year'):
+        req = requests.AllDataRequest(self.client.get_token(), self.oid,
+                                      date.today(), interval)
+        res = self.client.do_request(req)
