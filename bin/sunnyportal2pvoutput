@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2016 Erik Johansson <erik@ejohansson.se>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+# USA
+
+from datetime import date
+from getpass import getpass
+
+import configparser
+import http.client as http
+import logging
+import sys
+import sunnyportal.client
+import time
+import urllib.parse
+
+def add_batch_output(data, config):
+    headers = {"X-Pvoutput-Apikey": config['pvoutput']['apikey'],
+               "X-Pvoutput-SystemId": config['pvoutput']['systemid'],
+               "Content-type": "application/x-www-form-urlencoded",
+               "Accept": "text/plain"}
+    conn = http.HTTPConnection('pvoutput.org')
+    url = "/service/r2/addbatchoutput.jsp"
+    params = urllib.parse.urlencode({"data": ";".join(data)})
+    while True:
+        conn.request("POST", url, params, headers)
+        response = conn.getresponse()
+        print(response.status, response.reason)
+        res = response.read()
+        print(res)
+        conn.close()
+        if 'Load in progress' not in str(res):
+            time.sleep(10)
+            break
+        time.sleep(10)
+
+
+def main():
+    logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
+                        level=logging.DEBUG)
+    log = logging.getLogger(__name__)
+
+    if len(sys.argv) != 2:
+        print("Usage: %s <config>" % sys.argv[0])
+        sys.exit(1)
+
+    config = configparser.ConfigParser()
+    config['sunnyportal'] = {}
+    config['pvoutput'] = {}
+    config.read(sys.argv[1])
+
+    if not config['sunnyportal'].get('email'):
+        config['sunnyportal']['email'] = input("Sunny Portal e-mail: ")
+    if not config['sunnyportal'].get('password'):
+        config['sunnyportal']['password'] = getpass("Sunny Portal password: ")
+
+    if not config['pvoutput'].get('apikey'):
+        config['pvoutput']['apikey'] = input("PVOutput API key: ")
+    if not config['pvoutput'].get('systemid'):
+        config['pvoutput']['systemid'] = input("PVOutput System Id: ")
+
+    with open(sys.argv[1], 'w') as f:
+        config.write(f)
+
+    client = sunnyportal.client.Client(
+        config['sunnyportal']['email'], config['sunnyportal']['password'])
+    plant = client.get_plants()[0]
+
+    data = []
+    for month in plant.all_data('month').energy:
+        for day in plant.month_overview(month[0]).energy:
+            data.append("%s,%s" % (day[0].strftime("%Y%m%d"), day[2]))
+            if len(data) == 30:
+                add_batch_output(data, config)
+                data = []
+    if data:
+        add_batch_output(data, config)
+    client.logout()
+
+if __name__ == '__main__':
+    main()
