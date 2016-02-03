@@ -83,3 +83,18 @@ class Plant(object):
         req = requests.AllDataRequest(self.client.get_token(), self.oid,
                                       date.today(), interval)
         res = self.client.do_request(req)
+
+    def day_overview(self, date):
+        req = requests.DayOverviewRequest(self.client.get_token(), self.oid,
+                                          date)
+        res = self.client.do_request(req)
+
+    def month_overview(self, date):
+        req = requests.MonthOverviewRequest(self.client.get_token(), self.oid,
+                                            date)
+        res = self.client.do_request(req)
+
+    def year_overview(self, date):
+        req = requests.YearOverviewRequest(self.client.get_token(), self.oid,
+                                           date)
+        res = self.client.do_request(req)

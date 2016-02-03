@@ -158,3 +158,27 @@ class AllDataRequest(DataRequest):
 
     def handle_response(self, data):
         return responses.AllDataResponse(data)
+
+
+class DayOverviewRequest(DataRequest):
+    def __init__(self, token, oid, date):
+        super().__init__(token, oid, 'overview-day-fifteen-total', date)
+
+    def handle_response(self, data):
+        return responses.DayOverviewResponse(data)
+
+
+class MonthOverviewRequest(DataRequest):
+    def __init__(self, token, oid, date):
+        super().__init__(token, oid, 'overview-month-total', date)
+
+    def handle_response(self, data):
+        return responses.MonthOverviewResponse(data)
+
+
+class YearOverviewRequest(DataRequest):
+    def __init__(self, token, oid, date):
+        super().__init__(token, oid, 'overview-year-total', date)
+
+    def handle_response(self, data):
+        return responses.YearOverviewResponse(data)
