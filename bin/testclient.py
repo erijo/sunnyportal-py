@@ -52,8 +52,8 @@ def main():
     for plant in client.get_plants():
         log.info("Found plant %s", plant.name)
         #plant.profile()
-        #plant.last_data_exact()
-        #plant.all_data()
+        #plant.last_data_exact(date.today())
+        #plant.all_data('year')
         #plant.all_data('month')
         #plant.day_overview(date(2016, 2, 3))
         #plant.month_overview(date(2016, 1, 1))

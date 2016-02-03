@@ -16,7 +16,6 @@
 # USA
 
 from . import requests
-from datetime import date
 
 import http.client as http
 import logging
@@ -70,31 +69,29 @@ class Plant(object):
         self.oid = oid
         self.name = name
 
+    def get_token(self):
+        return self.client.get_token()
+
     def profile(self):
-        req = requests.PlantProfileRequest(self.client.get_token(), self.oid)
-        res = self.client.do_request(req)
+        req = requests.PlantProfileRequest(self.get_token(), self.oid)
+        return self.client.do_request(req)
 
-    def last_data_exact(self):
-        req = requests.LastDataExactRequest(self.client.get_token(), self.oid,
-                                            date.today())
-        res = self.client.do_request(req)
+    def last_data_exact(self, date):
+        req = requests.LastDataExactRequest(self.get_token(), self.oid, date)
+        return self.client.do_request(req)
 
-    def all_data(self, interval='year'):
-        req = requests.AllDataRequest(self.client.get_token(), self.oid,
-                                      date.today(), interval)
-        res = self.client.do_request(req)
+    def all_data(self, interval):
+        req = requests.AllDataRequest(self.get_token(), self.oid, interval)
+        return self.client.do_request(req)
 
     def day_overview(self, date):
-        req = requests.DayOverviewRequest(self.client.get_token(), self.oid,
-                                          date)
-        res = self.client.do_request(req)
+        req = requests.DayOverviewRequest(self.get_token(), self.oid, date)
+        return self.client.do_request(req)
 
     def month_overview(self, date):
-        req = requests.MonthOverviewRequest(self.client.get_token(), self.oid,
-                                            date)
-        res = self.client.do_request(req)
+        req = requests.MonthOverviewRequest(self.get_token(), self.oid, date)
+        return self.client.do_request(req)
 
     def year_overview(self, date):
-        req = requests.YearOverviewRequest(self.client.get_token(), self.oid,
-                                           date)
-        res = self.client.do_request(req)
+        req = requests.YearOverviewRequest(self.get_token(), self.oid, date)
+        return self.client.do_request(req)

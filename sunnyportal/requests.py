@@ -151,10 +151,10 @@ class LastDataExactRequest(DataRequest):
 
 
 class AllDataRequest(DataRequest):
-    def __init__(self, token, oid, date, interval='year'):
+    def __init__(self, token, oid, interval):
         """interval is year or month"""
         params = {'period': 'infinite', 'interval': interval, 'unit': 'kWh'}
-        super().__init__(token, oid, 'Energy', date, params)
+        super().__init__(token, oid, 'Energy', datetime.today(), params)
 
     def handle_response(self, data):
         return responses.AllDataResponse(data)
