@@ -36,6 +36,7 @@ def main():
 
     section = 'sunnyportal'
     config = configparser.ConfigParser()
+    config[section] = {}
     config.read(sys.argv[1])
 
     if not config[section].get('email'):
