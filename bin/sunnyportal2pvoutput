@@ -35,8 +35,10 @@ def add_batch_output(data, config):
                "Accept": "text/plain"}
     conn = http.HTTPConnection('pvoutput.org')
     url = "/service/r2/addbatchoutput.jsp"
-    params = urllib.parse.urlencode({"data": ";".join(data)})
-    while True:
+    offset = 0
+    while offset < len(data):
+        entries = data[offset:offset + 30]
+        params = urllib.parse.urlencode({"data": ";".join(entries)})
         conn.request("POST", url, params, headers)
         response = conn.getresponse()
         print(response.status, response.reason)
@@ -44,9 +46,10 @@ def add_batch_output(data, config):
         print(res)
         conn.close()
         if 'Load in progress' not in str(res):
+            offset += len(entries)
             time.sleep(10)
-            break
-        time.sleep(10)
+        else:
+            time.sleep(20)
 
 
 def main():
@@ -83,12 +86,14 @@ def main():
     data = []
     for month in plant.all_data('month').energy:
         for day in plant.month_overview(month[0]).energy:
+            peak = (None,0)
+            for hour in plant.day_overview(day[0]).power:
+                if hour[1] > peak[1]:
+                    peak = hour
             data.append("%s,%s" % (day[0].strftime("%Y%m%d"), day[2]))
-            if len(data) == 30:
-                add_batch_output(data, config)
-                data = []
-    if data:
-        add_batch_output(data, config)
+            if peak[0] is not None:
+                data[-1] += ",,,%s,%s" % (peak[1], peak[0].strftime("%H:%M"))
+    add_batch_output(data, config)
     client.logout()
 
 if __name__ == '__main__':
