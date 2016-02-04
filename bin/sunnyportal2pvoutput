@@ -41,21 +41,39 @@ def add_batch_output(data, config):
         params = urllib.parse.urlencode({"data": ";".join(entries)})
         conn.request("POST", url, params, headers)
         response = conn.getresponse()
-        print(response.status, response.reason)
-        res = response.read()
-        print(res)
+        body = response.read().decode('utf-8')
+        logging.debug("Add batch: %d (%s): %s",
+                      response.status, response.reason, body)
         conn.close()
-        if 'Load in progress' not in str(res):
+        if response.status == http.OK:
             offset += len(entries)
-            time.sleep(10)
-        else:
+            if offset < len(data):
+                time.sleep(10)
+        elif (response.status == http.BAD_REQUEST
+              and 'Load in progress' in body):
             time.sleep(20)
+        else:
+            logging.error("Failed to add batch: %s", body)
+            raise Exception("could not add batch")
 
+def get_data_for_day(plant, date):
+    day = plant.day_overview(date)
+    if day.difference is None:
+        return None
+    # Find peak hour and power
+    peak = (None, 0)
+    for hour in day.power:
+        if hour[1] > peak[1]:
+            peak = hour
+
+    data = "%s,%s" % (day.date.strftime("%Y%m%d"), day.difference)
+    if peak[0] is not None:
+        data += ",,,%s,%s" % (peak[1], peak[0].strftime("%H:%M"))
+    return data
 
 def main():
     logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
                         level=logging.DEBUG)
-    log = logging.getLogger(__name__)
 
     if len(sys.argv) != 2:
         print("Usage: %s <config>" % sys.argv[0])
@@ -84,15 +102,14 @@ def main():
     plant = client.get_plants()[0]
 
     data = []
-    for month in plant.all_data('month').energy:
-        for day in plant.month_overview(month[0]).energy:
-            peak = (None,0)
-            for hour in plant.day_overview(day[0]).power:
-                if hour[1] > peak[1]:
-                    peak = hour
-            data.append("%s,%s" % (day[0].strftime("%Y%m%d"), day[2]))
-            if peak[0] is not None:
-                data[-1] += ",,,%s,%s" % (peak[1], peak[0].strftime("%H:%M"))
+    if True:
+        data.append(get_data_for_day(plant, date.today()))
+    else:
+        for month in plant.all_data('month').energy:
+            for day in plant.month_overview(month[0]).energy:
+                res = get_data_for_day(plant, day[0])
+                if res:
+                    data.append(res)
     add_batch_output(data, config)
     client.logout()
 
