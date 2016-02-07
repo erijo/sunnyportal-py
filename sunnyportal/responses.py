@@ -162,6 +162,7 @@ class AllDataResponse(DataResponse):
     def parse(self, data):
         tag = super().parse(data)
         tag = self.find_or_raise(tag, './Energy/channel/infinite')
+        self.timestamp = self.parse_timestamp(tag, "%d/%m/%Y %H:%M")
 
         child = ('year', "%Y")
         if tag.find('month') is not None:

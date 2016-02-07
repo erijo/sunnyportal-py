@@ -17,7 +17,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-from datetime import date
+from datetime import date, timedelta
 from getpass import getpass
 
 import configparser
@@ -28,33 +28,41 @@ import sunnyportal.client
 import time
 import urllib.parse
 
-def add_batch_output(data, config):
-    headers = {"X-Pvoutput-Apikey": config['pvoutput']['apikey'],
-               "X-Pvoutput-SystemId": config['pvoutput']['systemid'],
-               "Content-type": "application/x-www-form-urlencoded",
-               "Accept": "text/plain"}
-    conn = http.HTTPConnection('pvoutput.org')
-    url = "/service/r2/addbatchoutput.jsp"
-    offset = 0
-    while offset < len(data):
-        entries = data[offset:offset + 30]
-        params = urllib.parse.urlencode({"data": ";".join(entries)})
-        conn.request("POST", url, params, headers)
-        response = conn.getresponse()
-        body = response.read().decode('utf-8')
-        logging.debug("Add batch: %d (%s): %s",
-                      response.status, response.reason, body)
-        conn.close()
-        if response.status == http.OK:
-            offset += len(entries)
-            if offset < len(data):
-                time.sleep(10)
-        elif (response.status == http.BAD_REQUEST
-              and 'Load in progress' in body):
-            time.sleep(20)
-        else:
-            logging.error("Failed to add batch: %s", body)
-            raise Exception("could not add batch")
+class PvOutput(object):
+    def __init__(self, apikey, systemid):
+        self.headers = {
+            "X-Pvoutput-Apikey": apikey,
+            "X-Pvoutput-SystemId": systemid,
+            "Content-type": "application/x-www-form-urlencoded",
+            "Accept": "text/plain"
+        }
+
+    def create_connection(self):
+        return http.HTTPConnection('pvoutput.org')
+
+    def add_batch_output(self, data):
+        conn = self.create_connection()
+        url = "/service/r2/addbatchoutput.jsp"
+        offset = 0
+        while offset < len(data):
+            entries = data[offset:offset + 30]
+            params = urllib.parse.urlencode({"data": ";".join(entries)})
+            conn.request("POST", url, params, self.headers)
+            response = conn.getresponse()
+            body = response.read().decode('utf-8')
+            logging.debug("Add batch: %d (%s): %s",
+                          response.status, response.reason, body)
+            conn.close()
+            if response.status == http.OK:
+                offset += len(entries)
+                if offset < len(data):
+                    time.sleep(10)
+            elif (response.status == http.BAD_REQUEST
+                  and 'Load in progress' in body):
+                time.sleep(20)
+            else:
+                logging.error("Failed to add batch: %s", body)
+                raise Exception("could not add batch")
 
 def get_data_for_day(plant, date):
     day = plant.day_overview(date)
@@ -69,6 +77,20 @@ def get_data_for_day(plant, date):
     data = "%s,%s" % (day.date.strftime("%Y%m%d"), day.difference)
     if peak[0] is not None:
         data += ",,,%s,%s" % (peak[1], peak[0].strftime("%H:%M"))
+    return data
+
+def get_data_for_period(plant, start_date=None, end_date=None):
+    if start_date is None:
+        start_date = plant.all_data('year').timestamp.date()
+    if end_date is None:
+        end_date = date.today()
+
+    data = []
+    while start_date <= end_date:
+        res = get_data_for_day(plant, start_date)
+        if res:
+            data.append(res)
+        start_date = start_date + timedelta(days=1)
     return data
 
 def main():
@@ -97,20 +119,17 @@ def main():
     with open(sys.argv[1], 'w') as f:
         config.write(f)
 
+    pvoutput = PvOutput(config['pvoutput']['apikey'],
+                        config['pvoutput']['systemid'])
+
     client = sunnyportal.client.Client(
         config['sunnyportal']['email'], config['sunnyportal']['password'])
     plant = client.get_plants()[0]
 
-    data = []
-    if True:
-        data.append(get_data_for_day(plant, date.today()))
-    else:
-        for month in plant.all_data('month').energy:
-            for day in plant.month_overview(month[0]).energy:
-                res = get_data_for_day(plant, day[0])
-                if res:
-                    data.append(res)
-    add_batch_output(data, config)
+    start_date = date.today() - timedelta(days=2)
+    data = get_data_for_period(plant, start_date=start_date)
+    pvoutput.add_batch_output(data)
+
     client.logout()
 
 if __name__ == '__main__':
