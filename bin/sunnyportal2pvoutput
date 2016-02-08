@@ -57,10 +57,12 @@ class PvOutput(object):
         conn.close()
         return (status, reason, body)
 
-    def add_status(self, datetime, generated_energy):
+    def add_status(self, datetime, generated_energy, power=None):
         params = {"d": datetime.strftime("%Y%m%d"),
                   "t": datetime.strftime("%H:%M"),
                   "v1": generated_energy}
+        if power is not None:
+            params["v2"] = power
         (status, reason, body) = self.send_request(
             "/service/r2/addstatus.jsp", params)
         if status != http.OK:
@@ -160,8 +162,13 @@ def main():
                         args.dry_run)
 
     if args.status:
-        last = plant.last_data_exact(date.today())
-        pvoutput.add_status(last.hour.timestamp, last.day.difference)
+        day = plant.day_overview(date.today())
+        if day.power_measurements:
+            pvoutput.add_status(day.power_measurements[-1].timestamp,
+                                day.difference,
+                                day.power_measurements[-1].power)
+        elif day.difference is not None:
+            pvoutput.add_status(day.date, day.difference)
 
     if args.output:
         start_date = date.today() - timedelta(days=7)
