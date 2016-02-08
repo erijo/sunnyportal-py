@@ -28,7 +28,6 @@ import sunnyportal.client
 def main():
     logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
                         level=logging.DEBUG)
-    log = logging.getLogger(__name__)
 
     if len(sys.argv) != 2:
         print("Usage: %s <config>" % sys.argv[0])
@@ -51,7 +50,7 @@ def main():
         config[section]['email'], config[section]['password'])
 
     for plant in client.get_plants():
-        log.info("Found plant %s", plant.name)
+        logging.info("Found plant %s", plant.name)
         #plant.profile()
         #plant.last_data_exact(date.today())
         #plant.all_data('year')

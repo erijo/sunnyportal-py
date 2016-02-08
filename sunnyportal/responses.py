@@ -15,6 +15,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
+from collections import namedtuple
 from datetime import datetime
 
 import logging
@@ -40,6 +41,9 @@ class ResponseError(Error):
             s = "%s: %s" % (self.code, s)
         return s
 
+
+Yield = namedtuple('Yield', ['timestamp', 'absolute', 'difference'])
+Power = namedtuple('Power', ['timestamp', 'power'])
 
 class ResponseBase(object):
     def __init__(self, data):
@@ -121,10 +125,9 @@ class PlantProfileResponse(ResponseBase):
 
 class DataResponse(ResponseBase):
     def kwh_to_wh(self, kwh):
-        if kwh is not None:
-            return int(float(kwh) * 1000)
-        else:
-            return kwh
+        if kwh is None:
+            return None
+        return int(float(kwh) * 1000)
 
     def parse_timestamp(self, tag, ts_format):
         return datetime.strptime(
@@ -144,16 +147,17 @@ class LastDataExactResponse(DataResponse):
         day = self.find_or_raise(tag, 'day')
         (absolute, difference) = self.parse_abs_diff(day)
         if absolute is not None and difference is not None:
-            date = self.parse_timestamp(day, "%d/%m/%Y").date()
-            self.day = (date, absolute, difference)
+            date = self.parse_timestamp(day, "%d/%m/%Y")
+            self.day = Yield(date, absolute, difference)
         else:
             self.day = None
 
         hour = self.find_or_raise(tag, 'hour')
         (absolute, difference) = self.parse_abs_diff(hour)
         if absolute is not None and difference is not None:
-            time = self.parse_timestamp(hour, "%H:%M").time()
-            self.hour = (time, absolute, difference)
+            time = self.parse_timestamp(hour, "%H:%M")
+            time = datetime.combine(self.day.timestamp, time.time())
+            self.hour = Yield(time, absolute, difference)
         else:
             self.hour = None
 
@@ -162,18 +166,19 @@ class AllDataResponse(DataResponse):
     def parse(self, data):
         tag = super().parse(data)
         tag = self.find_or_raise(tag, './Energy/channel/infinite')
-        self.timestamp = self.parse_timestamp(tag, "%d/%m/%Y %H:%M")
+        self.start_timestamp = self.parse_timestamp(tag, "%d/%m/%Y %H:%M")
 
-        child = ('year', "%Y")
+        fmt = ('year', "%Y")
         if tag.find('month') is not None:
-            child = ('month', '%m/%Y')
+            fmt = ('month', '%m/%Y')
 
-        self.energy = []
-        for entry in tag.iterfind(child[0]):
+        energy = []
+        for entry in tag.iterfind(fmt[0]):
             (absolute, difference) = self.parse_abs_diff(entry)
             if absolute is not None and difference is not None:
-                date = self.parse_timestamp(entry, child[1]).date()
-                self.energy.append((date, absolute, difference))
+                date = self.parse_timestamp(entry, fmt[1])
+                energy.append(Yield(date, absolute, difference))
+        setattr(self, '%ss' % fmt[0], energy)
 
 
 class OverviewResponse(DataResponse):
@@ -197,12 +202,13 @@ class DayOverviewResponse(OverviewResponse):
 
         self.parse_abs_diff_date(tag, "day", "%d/%m/%Y")
 
-        self.power = []
+        self.power_measurements = []
         for entry in tag.iterfind('./channel/day/fiveteen'):
             mean = self.kw_to_w(entry.get('mean'))
             if mean is not None:
-                time = self.parse_timestamp(entry, "%H:%M").time()
-                self.power.append((time, mean))
+                time = self.parse_timestamp(entry, "%H:%M")
+                time = datetime.combine(self.date, time.time())
+                self.power_measurements.append(Power(time, mean))
 
 
 class MonthOverviewResponse(OverviewResponse):
@@ -212,12 +218,12 @@ class MonthOverviewResponse(OverviewResponse):
 
         self.parse_abs_diff_date(tag, "month", "%m/%Y")
 
-        self.energy = []
+        self.days = []
         for entry in tag.iterfind('./channel/month/day'):
             (absolute, difference) = self.parse_abs_diff(entry)
             if absolute is not None and difference is not None:
-                date = self.parse_timestamp(entry, "%d/%m/%Y").date()
-                self.energy.append((date, absolute, difference))
+                date = self.parse_timestamp(entry, "%d/%m/%Y")
+                self.days.append(Yield(date, absolute, difference))
 
 
 class YearOverviewResponse(OverviewResponse):
@@ -227,9 +233,9 @@ class YearOverviewResponse(OverviewResponse):
 
         self.parse_abs_diff_date(tag, "year", "%Y")
 
-        self.energy = []
+        self.months = []
         for entry in tag.iterfind('./channel/year/month'):
             (absolute, difference) = self.parse_abs_diff(entry)
             if absolute is not None and difference is not None:
-                date = self.parse_timestamp(entry, "%m/%Y").date()
-                self.energy.append((date, absolute, difference))
+                date = self.parse_timestamp(entry, "%m/%Y")
+                self.months.append(Yield(date, absolute, difference))

@@ -25,12 +25,13 @@ import configparser
 import http.client as http
 import logging
 import sys
-import sunnyportal.client
+import sunnyportal.client, sunnyportal.responses
 import time
 import urllib.parse
 
 class PvOutput(object):
-    def __init__(self, apikey, systemid):
+    def __init__(self, apikey, systemid, dry_run):
+        self.dry_run = dry_run
         self.headers = {
             "X-Pvoutput-Apikey": apikey,
             "X-Pvoutput-SystemId": systemid,
@@ -40,6 +41,8 @@ class PvOutput(object):
 
     def send_request(self, url, params):
         logging.debug("POST to %s: %s", url, params)
+        if self.dry_run:
+            return (http.OK, "OK", "")
 
         conn = http.HTTPConnection('pvoutput.org')
         encoded = urllib.parse.urlencode(params)
@@ -86,19 +89,19 @@ def get_data_for_day(plant, date):
     if day.difference is None:
         return None
     # Find peak hour and power
-    peak = (None, 0)
-    for hour in day.power:
-        if hour[1] > peak[1]:
-            peak = hour
+    peak = sunnyportal.responses.Power(None, 0)
+    for measure in day.power_measurements:
+        if measure.power > peak.power:
+            peak = measure
 
     data = "%s,%s" % (day.date.strftime("%Y%m%d"), day.difference)
-    if peak[0] is not None:
-        data += ",,,%s,%s" % (peak[1], peak[0].strftime("%H:%M"))
+    if peak.timestamp is not None:
+        data += ",,,%s,%s" % (peak.power, peak.timestamp.strftime("%H:%M"))
     return data
 
 def get_data_for_period(plant, start_date=None, end_date=None):
     if start_date is None:
-        start_date = plant.all_data('year').timestamp.date()
+        start_date = plant.all_data('year').start_timestamp.date()
     if end_date is None:
         end_date = date.today()
 
@@ -122,6 +125,8 @@ def main():
     parser.add_argument('-o', '--output', help="Report last output(s)",
                         action="store_true")
     parser.add_argument('-q', '--quiet', help="Silence output",
+                        action="store_true")
+    parser.add_argument('-n', '--dry-run', help="Don't send any data",
                         action="store_true")
     args = parser.parse_args()
 
@@ -151,12 +156,12 @@ def main():
     plant = client.get_plants()[0]
 
     pvoutput = PvOutput(config['pvoutput']['apikey'],
-                        config['pvoutput']['systemid'])
+                        config['pvoutput']['systemid'],
+                        args.dry_run)
 
     if args.status:
         last = plant.last_data_exact(date.today())
-        pvoutput.add_status(datetime.combine(last.day[0], last.hour[0]),
-                            last.day[2])
+        pvoutput.add_status(last.hour.timestamp, last.day.difference)
 
     if args.output:
         start_date = date.today() - timedelta(days=7)
