@@ -69,6 +69,29 @@ class PvOutput(object):
             logging.error("Failed to add status: %s", body)
             raise Exception("could not add status")
 
+    def add_batch_status(self, statuses):
+        data = []
+        for status in statuses:
+            data.append(",".join([
+                status[0].strftime("%Y%m%d"),
+                status[0].strftime("%H:%M"),
+                str(status[2]), str(status[1])]))
+        offset = 0
+        while offset < len(data):
+            entries = data[offset:offset + 30]
+            (status, reason, body) = self.send_request(
+                "/service/r2/addbatchstatus.jsp",
+                {"data": ";".join(entries)})
+            if status == http.OK:
+                offset += len(entries)
+                if offset < len(data):
+                    time.sleep(10)
+            elif (status == http.BAD_REQUEST and 'Load in progress' in body):
+                time.sleep(20)
+            else:
+                logging.error("Failed to add status batch: %s", body)
+                raise Exception("could not add status batch")
+
     def add_batch_output(self, data):
         offset = 0
         while offset < len(data):
@@ -83,8 +106,8 @@ class PvOutput(object):
             elif (status == http.BAD_REQUEST and 'Load in progress' in body):
                 time.sleep(20)
             else:
-                logging.error("Failed to add batch: %s", body)
-                raise Exception("could not add batch")
+                logging.error("Failed to add output batch: %s", body)
+                raise Exception("could not add output batch")
 
 def get_data_for_day(plant, date):
     day = plant.day_overview(date)
@@ -164,9 +187,12 @@ def main():
     if args.status:
         day = plant.day_overview(date.today())
         if day.power_measurements:
-            pvoutput.add_status(day.power_measurements[-1].timestamp,
-                                day.difference,
-                                day.power_measurements[-1].power)
+            data = []
+            energy = day.difference
+            for measure in reversed(day.power_measurements):
+                data.append((measure.timestamp, measure.power, energy))
+                energy -= int(measure.power / 4)
+            pvoutput.add_batch_status(list(reversed(data[0:16])))
         elif day.difference is not None:
             pvoutput.add_status(day.date, day.difference)
 
