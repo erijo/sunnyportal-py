@@ -163,18 +163,24 @@ def main():
     config['pvoutput'] = {}
     config.read(args.config)
 
+    modified = False
     if not config['sunnyportal'].get('email'):
         config['sunnyportal']['email'] = input("Sunny Portal e-mail: ")
+        modified = True
     if not config['sunnyportal'].get('password'):
         config['sunnyportal']['password'] = getpass("Sunny Portal password: ")
+        modified = True
 
     if not config['pvoutput'].get('apikey'):
         config['pvoutput']['apikey'] = input("PVOutput API key: ")
+        modified = True
     if not config['pvoutput'].get('systemid'):
         config['pvoutput']['systemid'] = input("PVOutput System Id: ")
+        modified = True
 
-    with open(args.config, 'w') as f:
-        config.write(f)
+    if modified:
+        with open(args.config, 'w') as configfile:
+            config.write(configfile)
 
     client = sunnyportal.client.Client(
         config['sunnyportal']['email'], config['sunnyportal']['password'])
