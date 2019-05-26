@@ -118,57 +118,43 @@ class PlantListResponse(ResponseBase):
 
 
 class PlantProfileResponse(ResponseBase):
+    def kwp_to_wp(self, kw):
+        return DataResponse.kwh_to_wh(self, kw)
+
     def parse(self, data):
         tag = super().parse(data)
 
-        name = tag.find('name')
-        self.name = name.text
-        self.name_type = name.attrib['name']
 
-        peak_power = tag.find('peak-power')
-        self.peak_power_name = peak_power.attrib['name']
-        self.peak_power_unit = peak_power.attrib['unit']
-        self.peak_power = peak_power.text
+        self.name = tag.find('name').text
+        self.peak_power = self.kwp_to_wp(float(tag.find('peak-power').text))
+        self.city_country = tag.find('city-country').text
+        self.start_date = datetime.strptime(tag.find('start-date').text, "%d/%m/%Y")
 
-        city_country = tag.find('city-country')
-        self.city_country_name = city_country.attrib['name']
-        self.city_country = city_country.text
-
-        start_date = tag.find('start-date')
-        self.start_date_name = start_date.attrib['name']
-        self.start_date = datetime.strptime(start_date.text, "%d/%m/%Y")
+        description = tag.find('description')
+        if description is not None:
+            self.description = tag.find('description').text.replace('<br />', '\n')
+        else:
+            self.description = None
 
         plant_image = tag.find('plant-image')
-        self.plant_image_name = plant_image.attrib['name']
-        self.plant_image_height = plant_image.attrib['height']
-        self.plant_image_width = plant_image.attrib['width']
-        self.plant_image = plant_image.text
+        if plant_image is not None:
+            self.plant_image = {'image': plant_image.text, 'width': plant_image.attrib['width'],'height': plant_image.attrib['height']}
+        else:
+            self.plant_image = None
 
         self.production_data = []
         for channel in tag.find('production-data').findall('channel'):
-            name = channel.attrib['name']
-            meta_name = channel.attrib['meta-name']
-            unit = channel.attrib['unit']
-            text = channel.text
-            self.production_data.append({'name': name, 'meta-name': meta_name, 'unit': unit, 'text': text})
+            self.production_data.append({'name': channel.attrib['meta-name'], 'unit': channel.attrib['unit'], 'text': channel.text})
 
         self.inverters = []
         inverters = tag.find('inverters')
-        inverters_name = inverters.attrib['name']
         for inverter in inverters.findall('inverter'):
-            count = int(inverter.attrib['count'])
-            deviceIcon = inverter.attrib['deviceIcon']
-            text = inverter.text
-            self.production_data.append({'name': inverters_name, 'count': count, 'deviceIcon': deviceIcon, 'text': text})
+            self.inverters.append({'count': int(inverter.attrib['count']), 'deviceIcon': inverter.attrib['deviceIcon'], 'text': inverter.text})
 
-        self.communicationProducts = []
-        communicationProducts = tag.find('communicationProducts')
-        communicationProducts_name = communicationProducts.attrib['name']
-        for communicationProduct in communicationProducts.findall('communicationProduct'):
-            count = int(communicationProduct.attrib['count'])
-            deviceIcon = communicationProduct.attrib['deviceIcon']
-            text = communicationProduct.text
-            self.communicationProducts.append({'name': communicationProducts_name, 'count': count, 'deviceIcon': deviceIcon, 'text': text})
+        self.communication_products = []
+        communication_products = tag.find('communicationProducts')
+        for communication_product in communication_products.findall('communicationProduct'):
+            self.communication_products.append({'count': int(communication_product.attrib['count']), 'deviceIcon': communication_product.attrib['deviceIcon'], 'text': communication_product.text})
 
 
 class DataResponse(ResponseBase):
