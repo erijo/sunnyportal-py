@@ -124,7 +124,6 @@ class PlantProfileResponse(ResponseBase):
     def parse(self, data):
         tag = super().parse(data)
 
-
         self.name = tag.find('name').text
         self.peak_power = self.kwp_to_wp(float(tag.find('peak-power').text))
         self.city_country = tag.find('city-country').text
@@ -132,7 +131,7 @@ class PlantProfileResponse(ResponseBase):
 
         description = tag.find('description')
         if description is not None:
-            self.description = tag.find('description').text.replace('<br />', '\n')
+            self.description = tag.find('description').text.replace('<br />', '')
         else:
             self.description = None
 
