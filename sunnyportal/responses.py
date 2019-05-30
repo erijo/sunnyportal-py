@@ -132,7 +132,8 @@ class PlantProfileResponse(ResponseBase):
         self.name = tag.find('name').text
         self.peak_power = self.kwp_to_wp(tag.find('peak-power').text)
         self.city_country = tag.find('city-country').text
-        self.start_date = datetime.strptime(tag.find('start-date').text, "%d/%m/%Y")
+        self.start_date = datetime.strptime(
+            tag.find('start-date').text, "%d/%m/%Y")
 
         description = tag.find('description')
         if description is not None:
@@ -142,7 +143,9 @@ class PlantProfileResponse(ResponseBase):
 
         plant_image = tag.find('plant-image')
         if plant_image is not None:
-            self.plant_image = {'image': plant_image.text, 'width': plant_image.attrib['width'],'height': plant_image.attrib['height']}
+            self.plant_image = {'image': plant_image.text,
+                                'width': int(plant_image.attrib['width']),
+                                'height': int(plant_image.attrib['height'])}
         else:
             self.plant_image = None
 
@@ -153,12 +156,17 @@ class PlantProfileResponse(ResponseBase):
         self.inverters = []
         inverters = tag.find('inverters')
         for inverter in inverters.findall('inverter'):
-            self.inverters.append({'count': int(inverter.attrib['count']), 'deviceIcon': inverter.attrib['deviceIcon'], 'text': inverter.text})
+            self.inverters.append({'count': int(inverter.attrib['count']),
+                                   'deviceIcon': inverter.attrib['deviceIcon'],
+                                   'text': inverter.text})
 
         self.communication_products = []
         communication_products = tag.find('communicationProducts')
-        for communication_product in communication_products.findall('communicationProduct'):
-            self.communication_products.append({'count': int(communication_product.attrib['count']), 'deviceIcon': communication_product.attrib['deviceIcon'], 'text': communication_product.text})
+        for product in communication_products.findall('communicationProduct'):
+            self.communication_products.append(
+                {'count': int(product.attrib['count']),
+                 'deviceIcon': product.attrib['deviceIcon'],
+                 'name': product.text})
 
 
 class DataResponse(ResponseBase):
