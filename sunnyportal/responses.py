@@ -57,6 +57,11 @@ class ResponseBase(object):
     def get_creation_date(self):
         return datetime.strptime(self.creation_date, "%m/%d/%Y %I:%M:%S %p")
 
+    def kwh_to_wh(self, kwh):
+        if kwh is None:
+            return None
+        return int(float(kwh) * 1000)
+
     def find_or_raise(self, element, tag):
         child = element.find(tag)
         if child is None:
@@ -118,14 +123,14 @@ class PlantListResponse(ResponseBase):
 
 
 class PlantProfileResponse(ResponseBase):
-    def kwp_to_wp(self, kw):
-        return DataResponse.kwh_to_wh(self, kw)
+    def kwp_to_wp(self, kwp):
+        return self.kwh_to_wh(kwp)
 
     def parse(self, data):
         tag = super().parse(data)
 
         self.name = tag.find('name').text
-        self.peak_power = self.kwp_to_wp(float(tag.find('peak-power').text))
+        self.peak_power = self.kwp_to_wp(tag.find('peak-power').text)
         self.city_country = tag.find('city-country').text
         self.start_date = datetime.strptime(tag.find('start-date').text, "%d/%m/%Y")
 
@@ -157,11 +162,6 @@ class PlantProfileResponse(ResponseBase):
 
 
 class DataResponse(ResponseBase):
-    def kwh_to_wh(self, kwh):
-        if kwh is None:
-            return None
-        return int(float(kwh) * 1000)
-
     def parse_timestamp(self, tag, ts_format):
         return datetime.strptime(
             self.get_or_raise(tag, 'timestamp'), ts_format)
