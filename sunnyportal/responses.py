@@ -137,7 +137,8 @@ class PlantProfileResponse(ResponseBase):
 
         description = tag.find('description')
         if description is not None:
-            self.description = tag.find('description').text.replace('<br />', '')
+            self.description = \
+                tag.find('description').text.replace("<br />", "").rstrip()
         else:
             self.description = None
 
