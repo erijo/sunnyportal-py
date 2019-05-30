@@ -45,6 +45,7 @@ class ResponseError(Error):
 Yield = namedtuple('Yield', ['timestamp', 'absolute', 'difference'])
 Power = namedtuple('Power', ['timestamp', 'power'])
 
+
 class ResponseBase(object):
     def __init__(self, data):
         super().__init__()

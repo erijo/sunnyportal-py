@@ -20,7 +20,6 @@ from . import requests
 import http.client as http
 import logging
 import ssl
-import urllib.parse
 
 
 class Client(object):

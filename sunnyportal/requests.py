@@ -24,7 +24,6 @@ import hashlib
 import hmac
 import http.client as http
 import logging
-import re
 import urllib.parse
 
 
