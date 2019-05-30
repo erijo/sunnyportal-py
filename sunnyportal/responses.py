@@ -57,6 +57,11 @@ class ResponseBase(object):
     def get_creation_date(self):
         return datetime.strptime(self.creation_date, "%m/%d/%Y %I:%M:%S %p")
 
+    def kwh_to_wh(self, kwh):
+        if kwh is None:
+            return None
+        return int(float(kwh) * 1000)
+
     def find_or_raise(self, element, tag):
         child = element.find(tag)
         if child is None:
@@ -118,17 +123,54 @@ class PlantListResponse(ResponseBase):
 
 
 class PlantProfileResponse(ResponseBase):
+    def kwp_to_wp(self, kwp):
+        return self.kwh_to_wh(kwp)
+
     def parse(self, data):
         tag = super().parse(data)
-        # TODO: parse into something meaningful
+
+        self.name = tag.find('name').text
+        self.peak_power = self.kwp_to_wp(tag.find('peak-power').text)
+        self.city_country = tag.find('city-country').text
+        self.start_date = datetime.strptime(
+            tag.find('start-date').text, "%d/%m/%Y")
+
+        description = tag.find('description')
+        if description is not None:
+            self.description = \
+                tag.find('description').text.replace("<br />", "").rstrip()
+        else:
+            self.description = None
+
+        plant_image = tag.find('plant-image')
+        if plant_image is not None:
+            self.plant_image = {'image': plant_image.text,
+                                'width': int(plant_image.attrib['width']),
+                                'height': int(plant_image.attrib['height'])}
+        else:
+            self.plant_image = None
+
+        self.production_data = {}
+        for channel in tag.find('production-data').findall('channel'):
+            self.production_data[channel.attrib['meta-name']] = channel.text
+
+        self.inverters = []
+        inverters = tag.find('inverters')
+        for inverter in inverters.findall('inverter'):
+            self.inverters.append({'count': int(inverter.attrib['count']),
+                                   'deviceIcon': inverter.attrib['deviceIcon'],
+                                   'text': inverter.text})
+
+        self.communication_products = []
+        communication_products = tag.find('communicationProducts')
+        for product in communication_products.findall('communicationProduct'):
+            self.communication_products.append(
+                {'count': int(product.attrib['count']),
+                 'deviceIcon': product.attrib['deviceIcon'],
+                 'name': product.text})
 
 
 class DataResponse(ResponseBase):
-    def kwh_to_wh(self, kwh):
-        if kwh is None:
-            return None
-        return int(float(kwh) * 1000)
-
     def parse_timestamp(self, tag, ts_format):
         return datetime.strptime(
             self.get_or_raise(tag, 'timestamp'), ts_format)
