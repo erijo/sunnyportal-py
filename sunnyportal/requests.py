@@ -161,7 +161,7 @@ class AllDataRequest(DataRequest):
 
 class DayOverviewRequest(DataRequest):
     def __init__(self, token, oid, date):
-        super().__init__(token, oid, 'overview-day-fifteen-total', date)
+        super().__init__(token, oid, 'overview-day-total', date)
 
     def handle_response(self, data):
         return responses.DayOverviewResponse(data)

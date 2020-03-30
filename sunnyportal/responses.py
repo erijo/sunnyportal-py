@@ -241,12 +241,12 @@ class DayOverviewResponse(OverviewResponse):
 
     def parse(self, data):
         tag = super().parse(data)
-        tag = self.find_or_raise(tag, 'overview-day-fifteen-total')
+        tag = self.find_or_raise(tag, 'overview-day-total')
 
         self.parse_abs_diff_date(tag, "day", "%d/%m/%Y")
 
         self.power_measurements = []
-        for entry in tag.iterfind('./channel/day/fiveteen'):
+        for entry in tag.iterfind('./channel/day/hour'):
             mean = self.kw_to_w(entry.get('mean'))
             if mean is not None:
                 time = self.parse_timestamp(entry, "%H:%M")
