@@ -160,11 +160,13 @@ class AllDataRequest(DataRequest):
 
 
 class DayOverviewRequest(DataRequest):
-    def __init__(self, token, oid, date):
-        super().__init__(token, oid, 'overview-day-fifteen-total', date)
+    def __init__(self, token, oid, date, quarter):
+        self.quarter = quarter
+        data_type = "day-fifteen" if quarter else "day"
+        super().__init__(token, oid, 'overview-%s-total' % data_type, date)
 
     def handle_response(self, data):
-        return responses.DayOverviewResponse(data)
+        return responses.DayOverviewResponse(data, self.quarter)
 
 
 class MonthOverviewRequest(DataRequest):

@@ -83,8 +83,9 @@ class Plant(object):
         req = requests.AllDataRequest(self.get_token(), self.oid, interval)
         return self.client.do_request(req)
 
-    def day_overview(self, date):
-        req = requests.DayOverviewRequest(self.get_token(), self.oid, date)
+    def day_overview(self, date, quarter=True):
+        req = requests.DayOverviewRequest(
+            self.get_token(), self.oid, date, quarter)
         return self.client.do_request(req)
 
     def month_overview(self, date):

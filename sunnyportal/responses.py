@@ -236,17 +236,23 @@ class OverviewResponse(DataResponse):
 
 
 class DayOverviewResponse(OverviewResponse):
+    def __init__(self, data, quarter):
+        self.quarter = quarter
+        super().__init__(data)
+
     def kw_to_w(self, kw):
         return self.kwh_to_wh(kw)
 
     def parse(self, data):
         tag = super().parse(data)
-        tag = self.find_or_raise(tag, 'overview-day-fifteen-total')
+        tag_type = "day-fifteen" if self.quarter else "day"
+        tag = self.find_or_raise(tag, 'overview-%s-total' % tag_type)
 
         self.parse_abs_diff_date(tag, "day", "%d/%m/%Y")
 
         self.power_measurements = []
-        for entry in tag.iterfind('./channel/day/fiveteen'):
+        tag_name = "fiveteen" if self.quarter else "hour"
+        for entry in tag.iterfind('./channel/day/%s' % tag_name):
             mean = self.kw_to_w(entry.get('mean'))
             if mean is not None:
                 time = self.parse_timestamp(entry, "%H:%M")
