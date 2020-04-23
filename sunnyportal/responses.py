@@ -151,20 +151,24 @@ class PlantProfileResponse(ResponseBase):
         else:
             self.plant_image = None
 
+        def findall(tag, parent, children):
+            element = tag.find(parent)
+            if element is None:
+                return []
+            return element.findall(children)
+
         self.production_data = {}
-        for channel in tag.find('production-data').findall('channel'):
+        for channel in findall(tag, 'production-data', 'channel'):
             self.production_data[channel.attrib['meta-name']] = channel.text
 
         self.inverters = []
-        inverters = tag.find('inverters')
-        for inverter in inverters.findall('inverter'):
+        for inverter in findall(tag, 'inverters', 'inverter'):
             self.inverters.append({'count': int(inverter.attrib['count']),
                                    'deviceIcon': inverter.attrib['deviceIcon'],
                                    'text': inverter.text})
 
         self.communication_products = []
-        communication_products = tag.find('communicationProducts')
-        for product in communication_products.findall('communicationProduct'):
+        for product in findall(tag, 'communicationProducts', 'communicationProduct'):
             self.communication_products.append(
                 {'count': int(product.attrib['count']),
                  'deviceIcon': product.attrib['deviceIcon'],
