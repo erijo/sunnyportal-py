@@ -75,6 +75,12 @@ class Plant(object):
         req = requests.PlantProfileRequest(self.get_token(), self.oid)
         return self.client.do_request(req)
 
+    def get_devices(self):
+        req = requests.PlantDeviceListRequest(self.get_token(), self.oid)
+        res = self.client.do_request(req)
+        return [Device(self.client, self, d['oid'], d['name'])
+                for d in res.devices]
+
     def last_data_exact(self, date):
         req = requests.LastDataExactRequest(self.get_token(), self.oid, date)
         return self.client.do_request(req)
@@ -95,3 +101,14 @@ class Plant(object):
     def year_overview(self, date):
         req = requests.YearOverviewRequest(self.get_token(), self.oid, date)
         return self.client.do_request(req)
+
+
+class Device(object):
+    def __init__(self, client, plant, oid, name):
+        self.client = client
+        self.plant = plant
+        self.oid = oid
+        self.name = name
+
+    def get_token(self):
+        return self.client.get_token()

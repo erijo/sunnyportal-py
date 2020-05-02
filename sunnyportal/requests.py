@@ -131,6 +131,15 @@ class PlantProfileRequest(PlantRequest):
         return responses.PlantProfileResponse(data)
 
 
+class PlantDeviceListRequest(RequestBase):
+    def __init__(self, token, oid):
+        super().__init__(service='device', token=token)
+        self.prepare_url([oid], {'identifier': token.identifier})
+
+    def handle_response(self, data):
+        return responses.PlantDeviceListResponse(data)
+
+
 class DataRequest(RequestBase):
     def __init__(self, token, oid, data_type, date, params={}):
         super().__init__(service='data', token=token)

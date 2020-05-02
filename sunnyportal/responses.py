@@ -76,7 +76,7 @@ class ResponseBase(object):
                                          % (attribute, element.tag))
         return value
 
-    def parse(self, data):
+    def parse(self, data, name=None):
         self.log_response(data)
 
         root = ET.fromstring(data)
@@ -96,7 +96,8 @@ class ResponseBase(object):
         self.creation_date = self.get_or_raise(service, "creation-date")
         self.method = self.get_or_raise(service, "method").upper()
 
-        name = self.get_or_raise(service, "name")
+        if name is None:
+            name = self.get_or_raise(service, "name")
         return self.find_or_raise(service, name)
 
 
@@ -173,6 +174,22 @@ class PlantProfileResponse(ResponseBase):
                 {'count': int(product.attrib['count']),
                  'deviceIcon': product.attrib['deviceIcon'],
                  'name': product.text})
+
+
+class PlantDeviceListResponse(ResponseBase):
+    def parse(self, data):
+        self.devices = []
+        for d in super().parse(data, "devicelist").iterfind("device"):
+            startdate = datetime.strptime(self.get_or_raise(d, 'startdate'),
+                                          "%m/%d/%Y %I:%M:%S %p")
+            self.devices.append({
+                'oid': self.get_or_raise(d, 'oid'),
+                'name': self.get_or_raise(d, 'name'),
+                'class': self.get_or_raise(d, 'class'),
+                'serialnumber': self.get_or_raise(d, 'serialnumber'),
+                'type-id': self.get_or_raise(d, 'type-id'),
+                'startdate': startdate,
+            })
 
 
 class DataResponse(ResponseBase):
