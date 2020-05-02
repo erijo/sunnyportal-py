@@ -140,6 +140,22 @@ class PlantDeviceListRequest(RequestBase):
         return responses.PlantDeviceListResponse(data)
 
 
+class PlantDeviceRequest(RequestBase):
+    def __init__(self, token, plant_oid, device_oid, view, params={}):
+        super().__init__(service='device', token=token)
+        params['view'] = view
+        params['identifier'] = token.identifier
+        self.prepare_url([plant_oid, device_oid], params)
+
+
+class PlantDeviceParametersRequest(PlantDeviceRequest):
+    def __init__(self, token, plant_oid, device_oid):
+        super().__init__(token, plant_oid, device_oid, view='parameter')
+
+    def handle_response(self, data):
+        return responses.PlantDeviceParametersResponse(data)
+
+
 class DataRequest(RequestBase):
     def __init__(self, token, oid, data_type, date, params={}):
         super().__init__(service='data', token=token)

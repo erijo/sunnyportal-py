@@ -112,3 +112,8 @@ class Device(object):
 
     def get_token(self):
         return self.client.get_token()
+
+    def get_parameters(self):
+        req = requests.PlantDeviceParametersRequest(
+            self.get_token(), self.plant.oid, self.oid)
+        return self.client.do_request(req)

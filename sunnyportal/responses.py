@@ -44,6 +44,7 @@ class ResponseError(Error):
 
 Yield = namedtuple('Yield', ['timestamp', 'absolute', 'difference'])
 Power = namedtuple('Power', ['timestamp', 'power'])
+Parameter = namedtuple('Parameter', ['value', 'changed'])
 
 
 class ResponseBase(object):
@@ -190,6 +191,17 @@ class PlantDeviceListResponse(ResponseBase):
                 'type-id': self.get_or_raise(d, 'type-id'),
                 'startdate': startdate,
             })
+
+
+class PlantDeviceParametersResponse(ResponseBase):
+    def parse(self, data):
+        self.parameters = {}
+        for p in super().parse(data, "parameterlist").iterfind("parameter"):
+            name = self.get_or_raise(p, 'parameter-name')
+            value = self.get_or_raise(p, 'parameter-value')
+            changed = datetime.strptime(self.get_or_raise(p, 'last-change'),
+                                        "%m/%d/%Y %I:%M:%S %p")
+            self.parameters[name] = Parameter(value, changed)
 
 
 class DataResponse(ResponseBase):

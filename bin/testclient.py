@@ -53,6 +53,9 @@ def main():
         logging.info("Found plant %s", plant.name)
         #plant.profile()
         #plant.last_data_exact(date.today())
+        #for device in plant.get_devices():
+        #    for name, param in device.get_parameters().parameters.items():
+        #        print(f"{name} = {param.value} (changed {param.changed})")
         #plant.all_data('year')
         #plant.all_data('month')
         #plant.day_overview(date(2016, 2, 3))
