@@ -1,0 +1,417 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2020 Joel Berglund <joebe975@protonmail.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as
+# published by the Free Software Foundation; either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+# USA
+
+from datetime import date, datetime, timedelta
+from getpass import getpass
+
+import argparse
+import configparser
+import logging
+import sunnyportal.client, sunnyportal.responses
+import re
+import os
+import pandas as pd
+import numpy as np
+
+def valid_date_type(arg_date_str):
+    try:
+        m = re.match("(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})", arg_date_str)
+        d = date(int(m.group('year')),int(m.group('month')),int(m.group('day')))
+        if d>=date.today():
+            # Sunny Portal will return values for the whole day, while setting future times as blank (interpreted as 0)
+            logging.debug(f'Cannot look into the future ({d}), changing to yesterday...')
+            return date.today()-timedelta(days=1)
+        return d
+    except ValueError:
+        msg = f'Given Date {arg_date_str} not valid! Expected format, YYYY-MM-DD!'
+        raise argparse.ArgumentTypeError(msg)
+
+
+
+class DataFrameSaver:
+    def __init__(self, df, name,file_format):
+        self.df = df
+        self.name = name
+        self.file_extension = self.file_extension_dict[file_format]
+        self.previous_files = []
+    file_extension_dict = {'json':'json',
+                    'pickle':'pkl',
+                    'csv':'csv',
+                    'hdf':'h5',
+                    'feather':'feather',
+                    'parquet':'parquet',
+                    'excel':'xlsx'}
+    # Assuming the power in W is always an integer 
+    dtype_dict = {'timestamp':np.datetime64,
+            'mean_power':np.uint32,
+            'min_power':np.uint32,
+            'max_power':np.uint32}
+
+    def get_file_name(self):
+        start_date = np.amin(self.df['timestamp']).strftime('%Y-%m-%d')
+        end_date = np.amax(self.df['timestamp']).strftime('%Y-%m-%d')
+        return f'{self.name}_from_{start_date}_to_{end_date}.{self.file_extension}'
+
+    def remove_zero_elements(self):
+        mask = self.df['mean_power']>0
+        logging.debug(f'Removing rows with zero production from DataFrame ({np.sum(mask)} rows)')
+        self.df = self.df.loc[mask].reset_index(drop=True)
+
+    def read_file(self,file_name):
+        pass
+
+    def write_file(self,file_name):
+        pass
+
+    def append(self,file_name):
+        logging.debug(f'Reading old dataframe from file {file_name}')
+        df_old = self.read_file(file_name)
+        dtype_dict = {k: self.dtype_dict[k] for k in df_old.columns.values}
+        df_old = df_old.astype(dtype_dict)
+
+        self.df = pd.concat([df_old, self.df]).reset_index(drop=True)
+        self.previous_files.append(file_name)
+
+    def save_to_file(self, remove_zero=False):
+        if remove_zero:
+            self.remove_zero_elements()
+
+        if not self.df.shape[0]:
+            logging.debug('Empty DataFrame. Nothing to save...')
+            return
+        file_name = self.get_file_name()
+        logging.debug(f'Saving to file {file_name}')
+        self.write_file(file_name)
+        
+        # Delete old files
+        for old_file in self.previous_files:
+            os.remove(old_file)
+            logging.debug(f'File {old_file} was deleted.')
+
+class PickleSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        super().__init__(df, name, file_format='pickle')
+        self.kwargs = {}
+    def read_file(self,file_name):
+        return pd.read_pickle(file_name, **self.kwargs)
+
+    def write_file(self,file_name):
+        self.df.to_pickle(file_name, **self.kwargs)
+
+
+class JSONSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        super().__init__(df, name, file_format='json')
+        # Change json format below
+        self.kwargs = {'orient': 'table'}
+        
+    def read_file(self,file_name):
+        return pd.read_json(file_name,**self.kwargs)
+
+    def write_file(self,file_name):
+        self.df.to_json(file_name, index=False, **self.kwargs)
+
+
+class CSVSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        super().__init__(df, name, file_format='csv')
+        self.kwargs = {}
+
+    def read_file(self,file_name):
+        return pd.read_csv(file_name,parse_dates=['timestamp'], **self.kwargs)
+
+    def write_file(self,file_name):
+        self.df.to_csv(file_name, index=False, **self.kwargs)
+
+
+class HDFSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        super().__init__(df, name, file_format='hdf')
+        self.kwargs = {'key':'df'}
+
+    def read_file(self,file_name):
+        return pd.read_hdf(file_name,**self.kwargs)
+
+    def write_file(self,file_name):
+        self.df.to_hdf(file_name, mode='w', **self.kwargs)
+
+
+class ParquetSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        super().__init__(df, name, file_format='parquet')
+        self.kwargs = {}
+
+    def read_file(self,file_name):
+        return pd.read_parquet(file_name,**self.kwargs)
+
+    def write_file(self,file_name):
+        self.df.to_parquet(file_name, **self.kwargs)
+
+class SQLSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        raise NotImplementedError('sql details not setup')
+        from sqlalchemy import create_engine
+        super().__init__(df, name, file_format='sql')
+        self.engine = create_engine('sqlite://', echo=False)
+        self.kwargs = {'con':self.engine}
+
+    def read_file(self,file_name):
+        return pd.read_sql(file_name,**self.kwargs)
+
+    def write_file(self,file_name):
+        raise NotImplementedError('sql details not setup')
+        engine = create_engine('sqlite://', echo=False)
+        df.to_sql(file_name, index=False, **self.kwargs)
+
+class FeatherSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        super().__init__(df, name, file_format='feather')
+        self.kwargs = {}
+
+    def read_file(self,file_name):
+        return pd.read_feather(file_name,**self.kwargs)
+
+    def write_file(self,file_name):
+        self.df.to_feather(file_name, **self.kwargs)
+
+class ExcelSaver(DataFrameSaver):
+    def __init__(self, df, name):
+        super().__init__(df, name, file_format='excel')
+        self.kwargs = {}
+
+    def read_file(self,file_name):
+        return pd.read_excel(file_name,**self.kwargs)
+
+    def write_file(self,file_name):
+        self.df.to_excel(file_name, index=False, **self.kwargs)
+
+
+
+
+def get_df_saver(df, name, file_format):
+    
+    if file_format=='json':
+        df_saver = JSONSaver(df, name)
+
+    elif file_format=='pickle':
+        df_saver = PickleSaver(df, name)
+
+    elif file_format=='csv':
+        df_saver = CSVSaver(df, name)
+
+    elif file_format=='hdf':
+        df_saver = HDFSaver(df, name)
+
+    elif file_format=='feather':
+        df_saver = FeatherSaver(df, name)
+
+    elif file_format=='sql':
+        df_saver = SQLSaver(df, name)
+
+    elif file_format=='parquet':
+        df_saver = ParquetSaver(df, name)
+
+    elif file_format=='excel':
+        df_saver = ExcelSaver(df, name)
+
+    else:
+        raise ValueError(f'format {file_fomat} is not supported.')
+
+    logging.debug(f'{df_saver.__class__.__name__} fetched')
+    
+    return df_saver
+
+
+class DateError(Exception):
+    pass
+
+def write_to_file(name, df, file_format, remove_zero=False, previous_file=None):
+
+    df_saver = get_df_saver(df, name, file_format)
+
+    if previous_file:
+        df_saver.append(previous_file)
+
+    df_saver.save_to_file(remove_zero)
+
+
+def extract_oldest_data_file(name, file_format):
+    """Extract the file name of the file which has the oldest start date of a format file_format.
+
+
+    If tied for the oldest file, pick the one with the newest end date
+
+    """
+    oldest_file = None
+    candidates = []
+    start_dates = []
+
+    regex = re.compile(name + "_from_\d{4}-\d{2}-\d{2}_to_\d{4}-\d{2}-\d{2}[.]" + DataFrameSaver.file_extension_dict[file_format])
+    for this_file in os.listdir('.'):
+        if regex.match(this_file):
+            candidates.append(this_file)
+            start_dates.append(extract_date(this_file,'from'))
+   
+    start_dates = np.array(start_dates)
+    candidates = np.array(candidates)
+    if candidates.shape[0]:
+        mask = start_dates == np.amin(start_dates)
+        oldest_file = sorted(candidates[mask])[-1]
+        
+    return oldest_file
+
+
+def get_data_for_day(plant, date):
+    day = plant.day_overview(date)    
+    return day.power_measurements
+
+
+def extract_date(file_str, tag):
+    m = re.search(tag +"_(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})", file_str)
+    return date(int(m.group('year')),int(m.group('month')),int(m.group('day')))
+
+
+def get_data_for_period(plant, start_date, end_date):
+    if start_date>end_date:
+        raise DateError(f'start_date {start_date} cannot be larger than end_date {end_date}') 
+    
+    
+    timestamp = []
+    min_power = []
+    mean_power = []
+    max_power = []
+
+
+    while start_date <= end_date:
+        res = get_data_for_day(plant, start_date)
+        if res:
+            for power_measurement in res:
+                timestamp.append(power_measurement.timestamp)
+                min_power.append(power_measurement.min_power)
+                mean_power.append(power_measurement.mean_power)
+                max_power.append(power_measurement.max_power)
+        
+        start_date = start_date + timedelta(days=1)
+
+    data_dict = {}
+    data_dict['timestamp'] = timestamp
+    
+    if any(min_power):
+        data_dict['min_power'] = min_power
+
+    if any(mean_power):
+        data_dict['mean_power'] = mean_power
+
+    if any(max_power):
+        data_dict['max_power'] = max_power
+
+    dtypes = {k: DataFrameSaver.dtype_dict[k] for k in data_dict.keys()}
+    df = pd.DataFrame.from_dict(data_dict).fillna(0).astype(dtypes)
+
+    return df
+
+def main():
+    logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
+                        level=logging.DEBUG)
+
+    parser = argparse.ArgumentParser(
+        description="Save information from Sunny Portal to file")
+    parser.add_argument('config', help="Configuration file to use")
+    
+    parser.add_argument("-f","--format", choices=['json', 'csv', 'pickle', 'hdf', 'feather', 'parquet', 'excel'],
+                        required=True,
+                        help="Format for which the data is to be saved")
+
+    parser.add_argument('-s', '--start-date',
+                        type=valid_date_type,
+                        default=date.today() - timedelta(days=1),
+                        required=False,
+                        help="The start date of data to be saved in the format YYYY-MM-DD (default yesterday)")
+    parser.add_argument('-e', '--end-date', 
+                        type=valid_date_type,
+                        default=date.today() - timedelta(days=1),
+                        required=False,
+                        help="The end date of data to be saved in the format YYYY-MM-DD (default yesterday)")
+
+    parser.add_argument('-r', '--remove-zero',
+                        help="Remove data with timestamps with no production before saving",
+                        action="store_true")
+
+    parser.add_argument('-q', '--quiet',
+                        help="Silence output",
+                        action="store_true")
+    
+    parser.add_argument('-a', '--append',
+                        help="Extract only new data (overrides start-date) and append it with the data in existing file with the same format",
+                        action="store_true")
+
+    args = parser.parse_args()
+    
+    previous_file = None
+    start_date = args.start_date
+
+    if args.quiet:
+        logging.disable(logging.DEBUG)
+
+    config = configparser.ConfigParser()
+    config['sunnyportal'] = {}
+    config.read(args.config)
+
+    modified = False
+    if not config['sunnyportal'].get('email'):
+        config['sunnyportal']['email'] = input("Sunny Portal e-mail: ")
+        modified = True
+    if not config['sunnyportal'].get('password'):
+        config['sunnyportal']['password'] = getpass("Sunny Portal password: ")
+        modified = True
+
+    if modified:
+        with open(args.config, 'w') as configfile:
+            config.write(configfile)
+
+    client = sunnyportal.client.Client(
+        config['sunnyportal']['email'], config['sunnyportal']['password'])
+    
+    
+    for plant in client.get_plants():
+        
+        if args.append:
+            previous_file = extract_oldest_data_file(plant.name,args.format)
+            
+            if previous_file:
+                # Override start_date
+                start_date = extract_date(previous_file,'to') + timedelta(days=1) 
+                logging.debug(f'New start_date {start_date} was extracted from file {previous_file}')
+                if start_date>args.end_date:
+                    logging.debug(f'New start_date {start_date} was larger than end_date {args.end_date}. Nothing more to do...')
+                    return
+            else:
+                logging.debug(f'File was not found for name {plant.name} and format {args.format}')
+
+        logging.debug(f'Extracting DataFrame from {start_date} to {args.end_date}')
+        df = get_data_for_period(plant, start_date, args.end_date)
+        
+        write_to_file(plant.name,df,args.format, args.remove_zero, previous_file)
+    
+    
+
+    client.logout()
+
+if __name__ == '__main__':
+    main()
