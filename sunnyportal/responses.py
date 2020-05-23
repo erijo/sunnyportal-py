@@ -43,7 +43,7 @@ class ResponseError(Error):
 
 
 Yield = namedtuple('Yield', ['timestamp', 'absolute', 'difference'])
-Power = namedtuple('Power', ['timestamp', 'power'])
+Power = namedtuple('Power', ['timestamp', 'power', 'min', 'max'])
 Parameter = namedtuple('Parameter', ['value', 'changed'])
 Consumption = namedtuple('Consumption', ['external', 'internal', 'direct'])
 Generation = namedtuple('Generation', ['total', 'self_consumption', 'feed_in'])
@@ -293,7 +293,9 @@ class DayOverviewResponse(OverviewResponse):
             if mean is not None:
                 time = self.parse_timestamp(entry, "%H:%M")
                 time = datetime.combine(self.date, time.time())
-                self.power_measurements.append(Power(time, mean))
+                pmin = self.kw_to_w(entry.get('min'))
+                pmax = self.kw_to_w(entry.get('max'))
+                self.power_measurements.append(Power(time, mean, pmin, pmax))
 
 
 class MonthOverviewResponse(OverviewResponse):

@@ -114,7 +114,7 @@ def get_data_for_day(plant, date):
     if day.difference is None:
         return None
     # Find peak hour and power
-    peak = sunnyportal.responses.Power(None, 0)
+    peak = sunnyportal.responses.Power(None, 0, None, None)
     for measure in day.power_measurements:
         if measure.power > peak.power:
             peak = measure
