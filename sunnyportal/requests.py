@@ -208,3 +208,28 @@ class YearOverviewRequest(DataRequest):
 
     def handle_response(self, data):
         return responses.YearOverviewResponse(data)
+
+
+class EnergyBalanceRequest(RequestBase):
+    def __init__(self, token, oid, date, period, interval, total=False):
+        """
+        Valid intervals for a given period:
+        - infinite: year, month
+        - year: year, month, day
+        - month: month, day, hour, fifteen
+        - day: day, hour, fifteen
+        """
+        super().__init__(service='data', token=token)
+        params = {
+            'period': period,
+            'interval': interval,
+            'culture': 'en-gb',
+            'identifier': token.identifier,
+            'unit': 'kWh',
+        }
+        data_type = "energybalancetotal" if total else "energybalance"
+        self.prepare_url([oid, 'sets', data_type, date.strftime("%Y-%m-%d")],
+                         params)
+
+    def handle_response(self, data):
+        return responses.EnergyBalanceResponse(data)

@@ -52,6 +52,8 @@ def main():
     for plant in client.get_plants():
         logging.info("Found plant %s", plant.name)
         #plant.profile()
+        #plant.year_energy_balance(date(2020,4,1))
+        #plant.month_energy_balance(date(2020,4,1))
         #plant.last_data_exact(date.today())
         #for device in plant.get_devices():
         #    for name, param in device.get_parameters().parameters.items():

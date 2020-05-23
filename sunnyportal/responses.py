@@ -45,6 +45,9 @@ class ResponseError(Error):
 Yield = namedtuple('Yield', ['timestamp', 'absolute', 'difference'])
 Power = namedtuple('Power', ['timestamp', 'power'])
 Parameter = namedtuple('Parameter', ['value', 'changed'])
+Consumption = namedtuple('Consumption', ['external', 'internal', 'direct'])
+Generation = namedtuple('Generation', ['total', 'self_consumption', 'feed_in'])
+EnergyBalance = namedtuple('EnergyBalance', ['timestamp', 'consumption', 'generation'])
 
 
 class ResponseBase(object):
@@ -321,3 +324,44 @@ class YearOverviewResponse(OverviewResponse):
             if absolute is not None and difference is not None:
                 date = self.parse_timestamp(entry, "%m/%Y")
                 self.months.append(Yield(date, absolute, difference))
+
+
+class EnergyBalanceResponse(DataResponse):
+    def parse(self, data):
+        tag = super().parse(data)
+        tag = self.find_or_raise(tag, 'energybalance')
+
+        if tag.find('./*/month') is not None:
+            self.months = []
+            for entry in tag.iterfind('./*/month'):
+                date = self.parse_timestamp(entry, "%m/%Y")
+                b = self.parse_entry(entry, date)
+                if b is not None:
+                    self.months.append(b)
+            print(self.months)
+        elif tag.find('./*/day') is not None:
+            self.days = []
+            for entry in tag.iterfind('./*/day'):
+                date = self.parse_timestamp(entry, "%d/%m/%Y")
+                b = self.parse_entry(entry, date)
+                if b is not None:
+                    self.days.append(b)
+        else:
+            raise NotImplementedError("unsupported response")
+
+    def parse_entry(self, entry, timestamp):
+        consumption = Consumption(
+            self.kwh_to_wh(entry.get('external-supply')),
+            self.kwh_to_wh(entry.get('self-supply')),
+            self.kwh_to_wh(entry.get('direct-consumption')))
+        if any(m is None for m in consumption):
+            return None
+
+        generation = Generation(
+            self.kwh_to_wh(entry.get('pv-generation')),
+            self.kwh_to_wh(entry.get('self-consumption')),
+            self.kwh_to_wh(entry.get('feed-in')))
+        if any(m is None for m in generation):
+            return None
+
+        return EnergyBalance(timestamp, consumption, generation)

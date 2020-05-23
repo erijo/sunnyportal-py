@@ -102,6 +102,16 @@ class Plant(object):
         req = requests.YearOverviewRequest(self.get_token(), self.oid, date)
         return self.client.do_request(req)
 
+    def year_energy_balance(self, date):
+        req = requests.EnergyBalanceRequest(
+            self.get_token(), self.oid, date=date, period='year', interval='month')
+        return self.client.do_request(req)
+
+    def month_energy_balance(self, date):
+        req = requests.EnergyBalanceRequest(
+            self.get_token(), self.oid, date=date, period='month', interval='day')
+        return self.client.do_request(req)
+
 
 class Device(object):
     def __init__(self, client, plant, oid, name):
