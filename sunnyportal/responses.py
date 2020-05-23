@@ -272,8 +272,9 @@ class OverviewResponse(DataResponse):
 
 
 class DayOverviewResponse(OverviewResponse):
-    def __init__(self, data, quarter):
+    def __init__(self, data, quarter, include_all):
         self.quarter = quarter
+        self.include_all = include_all
         super().__init__(data)
 
     def kw_to_w(self, kw):
@@ -290,7 +291,7 @@ class DayOverviewResponse(OverviewResponse):
         tag_name = "fiveteen" if self.quarter else "hour"
         for entry in tag.iterfind('./channel/day/%s' % tag_name):
             mean = self.kw_to_w(entry.get('mean'))
-            if mean is not None:
+            if self.include_all or mean is not None:
                 time = self.parse_timestamp(entry, "%H:%M")
                 time = datetime.combine(self.date, time.time())
                 pmin = self.kw_to_w(entry.get('min'))
