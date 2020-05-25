@@ -202,37 +202,18 @@ class ExcelSaver(DataFrameSaver):
         self.df.to_excel(file_name, index=False, **self.kwargs)
 
 
-
+df_saver_dict = {'json':JSONSaver,
+        'pickle':PickleSaver,
+        'csv':CSVSaver,
+        'hdf':HDFSaver,
+        'feather':FeatherSaver,
+        'sql':SQLSaver,
+        'parquet':ParquetSaver,
+        'excel':ExcelSaver}
 
 def get_df_saver(df, name, file_format):
     
-    if file_format=='json':
-        df_saver = JSONSaver(df, name)
-
-    elif file_format=='pickle':
-        df_saver = PickleSaver(df, name)
-
-    elif file_format=='csv':
-        df_saver = CSVSaver(df, name)
-
-    elif file_format=='hdf':
-        df_saver = HDFSaver(df, name)
-
-    elif file_format=='feather':
-        df_saver = FeatherSaver(df, name)
-
-    elif file_format=='sql':
-        df_saver = SQLSaver(df, name)
-
-    elif file_format=='parquet':
-        df_saver = ParquetSaver(df, name)
-
-    elif file_format=='excel':
-        df_saver = ExcelSaver(df, name)
-
-    else:
-        raise ValueError(f'format {file_fomat} is not supported.')
-
+    df_saver = df_saver_dict[file_format](df, name)
     logging.debug(f'{df_saver.__class__.__name__} fetched')
     
     return df_saver
