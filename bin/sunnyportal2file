@@ -31,8 +31,7 @@ import numpy as np
 
 def valid_date_type(arg_date_str):
     try:
-        m = re.match("(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})", arg_date_str)
-        d = date(int(m.group('year')),int(m.group('month')),int(m.group('day')))
+        d = datetime.strptime(arg_date_str, '%Y-%m-%d').date()
         if d>=date.today():
             # Sunny Portal will return values for the whole day, while setting future times as blank (interpreted as 0)
             logging.debug(f'Cannot look into the future ({d}), changing to yesterday...')
