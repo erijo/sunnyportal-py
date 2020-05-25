@@ -278,7 +278,7 @@ def extract_oldest_data_file(name, file_format):
 
 
 def get_data_for_day(plant, date):
-    day = plant.day_overview(date)    
+    day = plant.day_overview(date, include_all=True)    
     return day.power_measurements
 
 
@@ -303,9 +303,9 @@ def get_data_for_period(plant, start_date, end_date):
         if res:
             for power_measurement in res:
                 timestamp.append(power_measurement.timestamp)
-                min_power.append(power_measurement.min_power)
-                mean_power.append(power_measurement.mean_power)
-                max_power.append(power_measurement.max_power)
+                min_power.append(power_measurement.min)
+                mean_power.append(power_measurement.power)
+                max_power.append(power_measurement.max)
         
         start_date = start_date + timedelta(days=1)
 
