@@ -91,7 +91,7 @@ class DataFrameSaver:
         if remove_zero:
             self.remove_zero_elements()
 
-        if not self.df.shape[0]:
+        if self.df.empty:
             logging.debug('Empty DataFrame. Nothing to save...')
             return
         file_name = self.get_file_name()
@@ -250,7 +250,7 @@ def extract_oldest_data_file(name, file_format):
    
     start_dates = np.array(start_dates)
     candidates = np.array(candidates)
-    if candidates.shape[0]:
+    if candidates.size:
         mask = start_dates == np.amin(start_dates)
         oldest_file = sorted(candidates[mask])[-1]
         
@@ -390,10 +390,11 @@ def main():
         logging.debug(f'Extracting DataFrame from {start_date} to {args.end_date} for plant {plant.name}')
         df = get_data_for_period(plant, start_date, args.end_date)
         
-        if not df.empty:
-            write_to_file(plant.name,df,args.format, args.remove_zero, previous_file)
-        else:
+        if df.empty:
             logging.debug(f'No data was found for plant {plant.name} between {start_date} and {args.end_date}')
+        else:
+            write_to_file(plant.name,df,args.format, args.remove_zero, previous_file)
+    
     
 
     client.logout()
