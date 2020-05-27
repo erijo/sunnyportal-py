@@ -301,6 +301,9 @@ def get_data_for_period(plant, start_date, end_date):
     if any(max_power):
         data_dict['max_power'] = max_power
 
+    if not timestamp:
+        return pd.DataFrame([])
+
     dtypes = {k: DataFrameSaver.dtype_dict[k] for k in data_dict.keys()}
     df = pd.DataFrame.from_dict(data_dict).fillna(0).astype(dtypes)
 
@@ -384,11 +387,13 @@ def main():
             else:
                 logging.debug(f'File was not found for name {plant.name} and format {args.format}')
 
-        logging.debug(f'Extracting DataFrame from {start_date} to {args.end_date}')
+        logging.debug(f'Extracting DataFrame from {start_date} to {args.end_date} for plant {plant.name}')
         df = get_data_for_period(plant, start_date, args.end_date)
         
-        write_to_file(plant.name,df,args.format, args.remove_zero, previous_file)
-    
+        if not df.empty:
+            write_to_file(plant.name,df,args.format, args.remove_zero, previous_file)
+        else:
+            logging.debug(f'No data was found for plant {plant.name} between {start_date} and {args.end_date}')
     
 
     client.logout()
