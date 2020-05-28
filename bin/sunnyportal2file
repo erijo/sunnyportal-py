@@ -56,7 +56,7 @@ class DataFrameSaver:
                     'feather':'feather',
                     'parquet':'parquet',
                     'excel':'xlsx'}
-    # Assuming the power in W is always an integer 
+    # Assuming the power in W is always an integer
     dtype_dict = {'timestamp':np.datetime64,
             'mean_power':np.uint32,
             'min_power':np.uint32,
@@ -97,7 +97,7 @@ class DataFrameSaver:
         file_name = self.get_file_name()
         logging.debug(f'Saving to file {file_name}')
         self.write_file(file_name)
-        
+
         # Delete old files
         for old_file in self.previous_files:
             os.remove(old_file)
@@ -119,7 +119,7 @@ class JSONSaver(DataFrameSaver):
         super().__init__(df, name, file_format='json')
         # Change json format below
         self.kwargs = {'orient': 'table'}
-        
+
     def read_file(self,file_name):
         return pd.read_json(file_name,**self.kwargs)
 
@@ -211,10 +211,10 @@ df_saver_dict = {'json':JSONSaver,
         'excel':ExcelSaver}
 
 def get_df_saver(df, name, file_format):
-    
+
     df_saver = df_saver_dict[file_format](df, name)
     logging.debug(f'{df_saver.__class__.__name__} fetched')
-    
+
     return df_saver
 
 
@@ -247,18 +247,18 @@ def extract_oldest_data_file(name, file_format):
         if regex.match(this_file):
             candidates.append(this_file)
             start_dates.append(extract_date(this_file,'from'))
-   
+
     start_dates = np.array(start_dates)
     candidates = np.array(candidates)
     if candidates.size:
         mask = start_dates == np.amin(start_dates)
         oldest_file = sorted(candidates[mask])[-1]
-        
+
     return oldest_file
 
 
 def get_data_for_day(plant, date):
-    day = plant.day_overview(date, include_all=True)    
+    day = plant.day_overview(date, include_all=True)
     return day.power_measurements
 
 
@@ -269,9 +269,9 @@ def extract_date(file_str, tag):
 
 def get_data_for_period(plant, start_date, end_date):
     if start_date>end_date:
-        raise DateError(f'start_date {start_date} cannot be larger than end_date {end_date}') 
-    
-    
+        raise DateError(f'start_date {start_date} cannot be larger than end_date {end_date}')
+
+
     timestamp = []
     min_power = []
     mean_power = []
@@ -286,12 +286,12 @@ def get_data_for_period(plant, start_date, end_date):
                 min_power.append(power_measurement.min)
                 mean_power.append(power_measurement.power)
                 max_power.append(power_measurement.max)
-        
+
         start_date = start_date + timedelta(days=1)
 
     data_dict = {}
     data_dict['timestamp'] = timestamp
-    
+
     if any(min_power):
         data_dict['min_power'] = min_power
 
@@ -316,7 +316,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Save information from Sunny Portal to file")
     parser.add_argument('config', help="Configuration file to use")
-    
+
     parser.add_argument("-f","--format", choices=['json', 'csv', 'pickle', 'hdf', 'feather', 'parquet', 'excel'],
                         required=True,
                         help="Format for which the data is to be saved")
@@ -326,7 +326,7 @@ def main():
                         default=date.today() - timedelta(days=1),
                         required=False,
                         help="The start date of data to be saved in the format YYYY-MM-DD (default yesterday)")
-    parser.add_argument('-e', '--end-date', 
+    parser.add_argument('-e', '--end-date',
                         type=valid_date_type,
                         default=date.today() - timedelta(days=1),
                         required=False,
@@ -339,13 +339,13 @@ def main():
     parser.add_argument('-q', '--quiet',
                         help="Silence output",
                         action="store_true")
-    
+
     parser.add_argument('-a', '--append',
                         help="Extract only new data (overrides start-date) and append it with the data in existing file with the same format",
                         action="store_true")
 
     args = parser.parse_args()
-    
+
     previous_file = None
     start_date = args.start_date
 
@@ -370,16 +370,16 @@ def main():
 
     client = sunnyportal.client.Client(
         config['sunnyportal']['email'], config['sunnyportal']['password'])
-    
-    
+
+
     for plant in client.get_plants():
-        
+
         if args.append:
             previous_file = extract_oldest_data_file(plant.name,args.format)
-            
+
             if previous_file:
                 # Override start_date
-                start_date = extract_date(previous_file,'to') + timedelta(days=1) 
+                start_date = extract_date(previous_file,'to') + timedelta(days=1)
                 logging.debug(f'New start_date {start_date} was extracted from file {previous_file}')
                 if start_date>args.end_date:
                     logging.debug(f'New start_date {start_date} was larger than end_date {args.end_date}. Nothing more to do...')
@@ -389,13 +389,13 @@ def main():
 
         logging.debug(f'Extracting DataFrame from {start_date} to {args.end_date} for plant {plant.name}')
         df = get_data_for_period(plant, start_date, args.end_date)
-        
+
         if df.empty:
             logging.debug(f'No data was found for plant {plant.name} between {start_date} and {args.end_date}')
         else:
             write_to_file(plant.name,df,args.format, args.remove_zero, previous_file)
-    
-    
+
+
 
     client.logout()
 
