@@ -23,8 +23,9 @@ import ssl
 
 
 class Client(object):
-    def __init__(self, username, password, server='com.sunny-portal.de',
-                 port=http.HTTPS_PORT):
+    def __init__(
+        self, username, password, server="com.sunny-portal.de", port=http.HTTPS_PORT
+    ):
         super().__init__()
         self.log = logging.getLogger(__name__)
         self.username = username
@@ -40,7 +41,8 @@ class Client(object):
 
     def do_request(self, request):
         conn = http.HTTPSConnection(
-            self.server, self.port, context=self.create_ssl_context())
+            self.server, self.port, context=self.create_ssl_context()
+        )
         return request.perform(conn)
 
     def get_token(self):
@@ -59,7 +61,7 @@ class Client(object):
     def get_plants(self):
         req = requests.PlantListRequest(self.get_token())
         res = self.do_request(req)
-        return [Plant(self, p['oid'], p['name']) for p in res.plants]
+        return [Plant(self, p["oid"], p["name"]) for p in res.plants]
 
 
 class Plant(object):
@@ -78,8 +80,7 @@ class Plant(object):
     def get_devices(self):
         req = requests.PlantDeviceListRequest(self.get_token(), self.oid)
         res = self.client.do_request(req)
-        return [Device(self.client, self, d['oid'], d['name'])
-                for d in res.devices]
+        return [Device(self.client, self, d["oid"], d["name"]) for d in res.devices]
 
     def last_data_exact(self, date):
         req = requests.LastDataExactRequest(self.get_token(), self.oid, date)
@@ -91,7 +92,8 @@ class Plant(object):
 
     def day_overview(self, date, quarter=True, include_all=False):
         req = requests.DayOverviewRequest(
-            self.get_token(), self.oid, date, quarter, include_all)
+            self.get_token(), self.oid, date, quarter, include_all
+        )
         return self.client.do_request(req)
 
     def month_overview(self, date):
@@ -104,12 +106,14 @@ class Plant(object):
 
     def year_energy_balance(self, date):
         req = requests.EnergyBalanceRequest(
-            self.get_token(), self.oid, date=date, period='year', interval='month')
+            self.get_token(), self.oid, date=date, period="year", interval="month"
+        )
         return self.client.do_request(req)
 
     def month_energy_balance(self, date):
         req = requests.EnergyBalanceRequest(
-            self.get_token(), self.oid, date=date, period='month', interval='day')
+            self.get_token(), self.oid, date=date, period="month", interval="day"
+        )
         return self.client.do_request(req)
 
 
@@ -125,5 +129,6 @@ class Device(object):
 
     def get_parameters(self):
         req = requests.PlantDeviceParametersRequest(
-            self.get_token(), self.plant.oid, self.oid)
+            self.get_token(), self.plant.oid, self.oid
+        )
         return self.client.do_request(req)

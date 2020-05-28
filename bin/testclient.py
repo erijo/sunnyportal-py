@@ -25,46 +25,50 @@ import logging
 import sys
 import sunnyportal.client
 
+
 def main():
-    logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
-                        level=logging.DEBUG)
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s: %(message)s", level=logging.DEBUG
+    )
 
     if len(sys.argv) != 2:
         print("Usage: %s <config>" % sys.argv[0])
         sys.exit(1)
 
-    section = 'sunnyportal'
+    section = "sunnyportal"
     config = configparser.ConfigParser()
     config[section] = {}
     config.read(sys.argv[1])
 
-    if not config[section].get('email'):
-        config[section]['email'] = input("E-mail: ")
-    if not config[section].get('password'):
-        config[section]['password'] = getpass()
+    if not config[section].get("email"):
+        config[section]["email"] = input("E-mail: ")
+    if not config[section].get("password"):
+        config[section]["password"] = getpass()
 
-    with open(sys.argv[1], 'w') as f:
+    with open(sys.argv[1], "w") as f:
         config.write(f)
 
     client = sunnyportal.client.Client(
-        config[section]['email'], config[section]['password'])
+        config[section]["email"], config[section]["password"]
+    )
 
     for plant in client.get_plants():
         logging.info("Found plant %s", plant.name)
-        #plant.profile()
-        #plant.year_energy_balance(date(2020,4,1))
-        #plant.month_energy_balance(date(2020,4,1))
-        #plant.last_data_exact(date.today())
-        #for device in plant.get_devices():
+        # plant.profile()
+        # plant.year_energy_balance(date(2020,4,1))
+        # plant.month_energy_balance(date(2020,4,1))
+        # plant.last_data_exact(date.today())
+        # for device in plant.get_devices():
         #    for name, param in device.get_parameters().parameters.items():
         #        print(f"{name} = {param.value} (changed {param.changed})")
-        #plant.all_data('year')
-        #plant.all_data('month')
-        #plant.day_overview(date(2016, 2, 3))
-        #plant.day_overview(date(2016, 2, 3), quarter=False)
-        #plant.month_overview(date(2016, 1, 1))
-        #plant.year_overview(date(2016, 2, 1))
+        # plant.all_data('year')
+        # plant.all_data('month')
+        # plant.day_overview(date(2016, 2, 3))
+        # plant.day_overview(date(2016, 2, 3), quarter=False)
+        # plant.month_overview(date(2016, 1, 1))
+        # plant.year_overview(date(2016, 2, 1))
     client.logout()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

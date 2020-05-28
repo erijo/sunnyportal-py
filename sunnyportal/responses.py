@@ -42,12 +42,12 @@ class ResponseError(Error):
         return s
 
 
-Yield = namedtuple('Yield', ['timestamp', 'absolute', 'difference'])
-Power = namedtuple('Power', ['timestamp', 'power', 'min', 'max'])
-Parameter = namedtuple('Parameter', ['value', 'changed'])
-Consumption = namedtuple('Consumption', ['external', 'internal', 'direct'])
-Generation = namedtuple('Generation', ['total', 'self_consumption', 'feed_in'])
-EnergyBalance = namedtuple('EnergyBalance', ['timestamp', 'consumption', 'generation'])
+Yield = namedtuple("Yield", ["timestamp", "absolute", "difference"])
+Power = namedtuple("Power", ["timestamp", "power", "min", "max"])
+Parameter = namedtuple("Parameter", ["value", "changed"])
+Consumption = namedtuple("Consumption", ["external", "internal", "direct"])
+Generation = namedtuple("Generation", ["total", "self_consumption", "feed_in"])
+EnergyBalance = namedtuple("EnergyBalance", ["timestamp", "consumption", "generation"])
 
 
 class ResponseBase(object):
@@ -76,8 +76,9 @@ class ResponseBase(object):
     def get_or_raise(self, element, attribute):
         value = element.get(attribute)
         if value is None:
-            raise MalformedResponseError("Missing %s attribute in %s tag"
-                                         % (attribute, element.tag))
+            raise MalformedResponseError(
+                "Missing %s attribute in %s tag" % (attribute, element.tag)
+            )
         return value
 
     def parse(self, data, name=None):
@@ -122,10 +123,12 @@ class PlantListResponse(ResponseBase):
     def parse(self, data):
         self.plants = []
         for p in super().parse(data).iterfind("plant"):
-            self.plants.append({
-                'oid': self.get_or_raise(p, 'oid'),
-                'name': self.get_or_raise(p, 'name')
-            })
+            self.plants.append(
+                {
+                    "oid": self.get_or_raise(p, "oid"),
+                    "name": self.get_or_raise(p, "name"),
+                }
+            )
 
 
 class PlantProfileResponse(ResponseBase):
@@ -135,24 +138,26 @@ class PlantProfileResponse(ResponseBase):
     def parse(self, data):
         tag = super().parse(data)
 
-        self.name = tag.find('name').text
-        self.peak_power = self.kwp_to_wp(tag.find('peak-power').text)
-        self.city_country = tag.find('city-country').text
-        self.start_date = datetime.strptime(
-            tag.find('start-date').text, "%d/%m/%Y")
+        self.name = tag.find("name").text
+        self.peak_power = self.kwp_to_wp(tag.find("peak-power").text)
+        self.city_country = tag.find("city-country").text
+        self.start_date = datetime.strptime(tag.find("start-date").text, "%d/%m/%Y")
 
-        description = tag.find('description')
+        description = tag.find("description")
         if description is not None:
-            self.description = \
-                tag.find('description').text.replace("<br />", "").rstrip()
+            self.description = (
+                tag.find("description").text.replace("<br />", "").rstrip()
+            )
         else:
             self.description = None
 
-        plant_image = tag.find('plant-image')
+        plant_image = tag.find("plant-image")
         if plant_image is not None:
-            self.plant_image = {'image': plant_image.text,
-                                'width': int(plant_image.attrib['width']),
-                                'height': int(plant_image.attrib['height'])}
+            self.plant_image = {
+                "image": plant_image.text,
+                "width": int(plant_image.attrib["width"]),
+                "height": int(plant_image.attrib["height"]),
+            }
         else:
             self.plant_image = None
 
@@ -163,67 +168,77 @@ class PlantProfileResponse(ResponseBase):
             return element.findall(children)
 
         self.production_data = {}
-        for channel in findall(tag, 'production-data', 'channel'):
-            self.production_data[channel.attrib['meta-name']] = channel.text
+        for channel in findall(tag, "production-data", "channel"):
+            self.production_data[channel.attrib["meta-name"]] = channel.text
 
         self.inverters = []
-        for inverter in findall(tag, 'inverters', 'inverter'):
-            self.inverters.append({'count': int(inverter.attrib['count']),
-                                   'deviceIcon': inverter.attrib['deviceIcon'],
-                                   'text': inverter.text})
+        for inverter in findall(tag, "inverters", "inverter"):
+            self.inverters.append(
+                {
+                    "count": int(inverter.attrib["count"]),
+                    "deviceIcon": inverter.attrib["deviceIcon"],
+                    "text": inverter.text,
+                }
+            )
 
         self.communication_products = []
-        for product in findall(tag, 'communicationProducts', 'communicationProduct'):
+        for product in findall(tag, "communicationProducts", "communicationProduct"):
             self.communication_products.append(
-                {'count': int(product.attrib['count']),
-                 'deviceIcon': product.attrib['deviceIcon'],
-                 'name': product.text})
+                {
+                    "count": int(product.attrib["count"]),
+                    "deviceIcon": product.attrib["deviceIcon"],
+                    "name": product.text,
+                }
+            )
 
 
 class PlantDeviceListResponse(ResponseBase):
     def parse(self, data):
         self.devices = []
         for d in super().parse(data, "devicelist").iterfind("device"):
-            startdate = datetime.strptime(self.get_or_raise(d, 'startdate'),
-                                          "%m/%d/%Y %I:%M:%S %p")
-            self.devices.append({
-                'oid': self.get_or_raise(d, 'oid'),
-                'name': self.get_or_raise(d, 'name'),
-                'class': self.get_or_raise(d, 'class'),
-                'serialnumber': self.get_or_raise(d, 'serialnumber'),
-                'type-id': self.get_or_raise(d, 'type-id'),
-                'startdate': startdate,
-            })
+            startdate = datetime.strptime(
+                self.get_or_raise(d, "startdate"), "%m/%d/%Y %I:%M:%S %p"
+            )
+            self.devices.append(
+                {
+                    "oid": self.get_or_raise(d, "oid"),
+                    "name": self.get_or_raise(d, "name"),
+                    "class": self.get_or_raise(d, "class"),
+                    "serialnumber": self.get_or_raise(d, "serialnumber"),
+                    "type-id": self.get_or_raise(d, "type-id"),
+                    "startdate": startdate,
+                }
+            )
 
 
 class PlantDeviceParametersResponse(ResponseBase):
     def parse(self, data):
         self.parameters = {}
         for p in super().parse(data, "parameterlist").iterfind("parameter"):
-            name = self.get_or_raise(p, 'parameter-name')
-            value = self.get_or_raise(p, 'parameter-value')
-            changed = datetime.strptime(self.get_or_raise(p, 'last-change'),
-                                        "%m/%d/%Y %I:%M:%S %p")
+            name = self.get_or_raise(p, "parameter-name")
+            value = self.get_or_raise(p, "parameter-value")
+            changed = datetime.strptime(
+                self.get_or_raise(p, "last-change"), "%m/%d/%Y %I:%M:%S %p"
+            )
             self.parameters[name] = Parameter(value, changed)
 
 
 class DataResponse(ResponseBase):
     def parse_timestamp(self, tag, ts_format):
-        return datetime.strptime(
-            self.get_or_raise(tag, 'timestamp'), ts_format)
+        return datetime.strptime(self.get_or_raise(tag, "timestamp"), ts_format)
 
     def parse_abs_diff(self, tag):
-        absolute = self.kwh_to_wh(tag.get('absolute'))
-        difference = self.kwh_to_wh(tag.get('difference'))
+        absolute = self.kwh_to_wh(tag.get("absolute"))
+        difference = self.kwh_to_wh(tag.get("difference"))
         return (absolute, difference)
 
 
 class LastDataExactResponse(DataResponse):
     def parse(self, data):
         tag = super().parse(data)
-        tag = self.find_or_raise(tag, './Energy/channel')
+        tag = self.find_or_raise(tag, "./Energy/channel")
 
-        day = self.find_or_raise(tag, 'day')
+        day = self.find_or_raise(tag, "day")
         (absolute, difference) = self.parse_abs_diff(day)
         if absolute is not None and difference is not None:
             date = self.parse_timestamp(day, "%d/%m/%Y")
@@ -231,7 +246,7 @@ class LastDataExactResponse(DataResponse):
         else:
             self.day = None
 
-        hour = self.find_or_raise(tag, 'hour')
+        hour = self.find_or_raise(tag, "hour")
         (absolute, difference) = self.parse_abs_diff(hour)
         if absolute is not None and difference is not None:
             time = self.parse_timestamp(hour, "%H:%M")
@@ -244,12 +259,12 @@ class LastDataExactResponse(DataResponse):
 class AllDataResponse(DataResponse):
     def parse(self, data):
         tag = super().parse(data)
-        tag = self.find_or_raise(tag, './Energy/channel/infinite')
+        tag = self.find_or_raise(tag, "./Energy/channel/infinite")
         self.start_timestamp = self.parse_timestamp(tag, "%d/%m/%Y %H:%M")
 
-        fmt = ('year', "%Y")
-        if tag.find('month') is not None:
-            fmt = ('month', '%m/%Y')
+        fmt = ("year", "%Y")
+        if tag.find("month") is not None:
+            fmt = ("month", "%m/%Y")
 
         energy = []
         for entry in tag.iterfind(fmt[0]):
@@ -257,7 +272,7 @@ class AllDataResponse(DataResponse):
             if absolute is not None and difference is not None:
                 date = self.parse_timestamp(entry, fmt[1])
                 energy.append(Yield(date, absolute, difference))
-        setattr(self, '%ss' % fmt[0], energy)
+        setattr(self, "%ss" % fmt[0], energy)
 
 
 class OverviewResponse(DataResponse):
@@ -283,31 +298,31 @@ class DayOverviewResponse(OverviewResponse):
     def parse(self, data):
         tag = super().parse(data)
         tag_type = "day-fifteen" if self.quarter else "day"
-        tag = self.find_or_raise(tag, 'overview-%s-total' % tag_type)
+        tag = self.find_or_raise(tag, "overview-%s-total" % tag_type)
 
         self.parse_abs_diff_date(tag, "day", "%d/%m/%Y")
 
         self.power_measurements = []
         tag_name = "fiveteen" if self.quarter else "hour"
-        for entry in tag.iterfind('./channel/day/%s' % tag_name):
-            mean = self.kw_to_w(entry.get('mean'))
+        for entry in tag.iterfind("./channel/day/%s" % tag_name):
+            mean = self.kw_to_w(entry.get("mean"))
             if self.include_all or mean is not None:
                 time = self.parse_timestamp(entry, "%H:%M")
                 time = datetime.combine(self.date, time.time())
-                pmin = self.kw_to_w(entry.get('min'))
-                pmax = self.kw_to_w(entry.get('max'))
+                pmin = self.kw_to_w(entry.get("min"))
+                pmax = self.kw_to_w(entry.get("max"))
                 self.power_measurements.append(Power(time, mean, pmin, pmax))
 
 
 class MonthOverviewResponse(OverviewResponse):
     def parse(self, data):
         tag = super().parse(data)
-        tag = self.find_or_raise(tag, 'overview-month-total')
+        tag = self.find_or_raise(tag, "overview-month-total")
 
         self.parse_abs_diff_date(tag, "month", "%m/%Y")
 
         self.days = []
-        for entry in tag.iterfind('./channel/month/day'):
+        for entry in tag.iterfind("./channel/month/day"):
             (absolute, difference) = self.parse_abs_diff(entry)
             if absolute is not None and difference is not None:
                 date = self.parse_timestamp(entry, "%d/%m/%Y")
@@ -317,12 +332,12 @@ class MonthOverviewResponse(OverviewResponse):
 class YearOverviewResponse(OverviewResponse):
     def parse(self, data):
         tag = super().parse(data)
-        tag = self.find_or_raise(tag, 'overview-year-total')
+        tag = self.find_or_raise(tag, "overview-year-total")
 
         self.parse_abs_diff_date(tag, "year", "%Y")
 
         self.months = []
-        for entry in tag.iterfind('./channel/year/month'):
+        for entry in tag.iterfind("./channel/year/month"):
             (absolute, difference) = self.parse_abs_diff(entry)
             if absolute is not None and difference is not None:
                 date = self.parse_timestamp(entry, "%m/%Y")
@@ -332,19 +347,19 @@ class YearOverviewResponse(OverviewResponse):
 class EnergyBalanceResponse(DataResponse):
     def parse(self, data):
         tag = super().parse(data)
-        tag = self.find_or_raise(tag, 'energybalance')
+        tag = self.find_or_raise(tag, "energybalance")
 
-        if tag.find('./*/month') is not None:
+        if tag.find("./*/month") is not None:
             self.months = []
-            for entry in tag.iterfind('./*/month'):
+            for entry in tag.iterfind("./*/month"):
                 date = self.parse_timestamp(entry, "%m/%Y")
                 b = self.parse_entry(entry, date)
                 if b is not None:
                     self.months.append(b)
             print(self.months)
-        elif tag.find('./*/day') is not None:
+        elif tag.find("./*/day") is not None:
             self.days = []
-            for entry in tag.iterfind('./*/day'):
+            for entry in tag.iterfind("./*/day"):
                 date = self.parse_timestamp(entry, "%d/%m/%Y")
                 b = self.parse_entry(entry, date)
                 if b is not None:
@@ -354,16 +369,18 @@ class EnergyBalanceResponse(DataResponse):
 
     def parse_entry(self, entry, timestamp):
         consumption = Consumption(
-            self.kwh_to_wh(entry.get('external-supply')),
-            self.kwh_to_wh(entry.get('self-supply')),
-            self.kwh_to_wh(entry.get('direct-consumption')))
+            self.kwh_to_wh(entry.get("external-supply")),
+            self.kwh_to_wh(entry.get("self-supply")),
+            self.kwh_to_wh(entry.get("direct-consumption")),
+        )
         if any(m is None for m in consumption):
             return None
 
         generation = Generation(
-            self.kwh_to_wh(entry.get('pv-generation')),
-            self.kwh_to_wh(entry.get('self-consumption')),
-            self.kwh_to_wh(entry.get('feed-in')))
+            self.kwh_to_wh(entry.get("pv-generation")),
+            self.kwh_to_wh(entry.get("self-consumption")),
+            self.kwh_to_wh(entry.get("feed-in")),
+        )
         if any(m is None for m in generation):
             return None
 

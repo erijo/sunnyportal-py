@@ -29,6 +29,7 @@ import sunnyportal.client, sunnyportal.responses
 import time
 import urllib.parse
 
+
 class PvOutput(object):
     def __init__(self, apikey, systemid, dry_run):
         self.dry_run = dry_run
@@ -36,7 +37,7 @@ class PvOutput(object):
             "X-Pvoutput-Apikey": apikey,
             "X-Pvoutput-SystemId": systemid,
             "Content-type": "application/x-www-form-urlencoded",
-            "Accept": "text/plain"
+            "Accept": "text/plain",
         }
 
     def send_request(self, url, params):
@@ -44,27 +45,28 @@ class PvOutput(object):
         if self.dry_run:
             return (http.OK, "OK", "")
 
-        conn = http.HTTPConnection('pvoutput.org')
+        conn = http.HTTPConnection("pvoutput.org")
         encoded = urllib.parse.urlencode(params)
         conn.request("POST", url, encoded, self.headers)
 
         response = conn.getresponse()
         status = response.status
         reason = response.reason
-        body = response.read().decode('utf-8')
+        body = response.read().decode("utf-8")
         logging.debug("HTTP response: %d (%s): %s", status, reason, body)
 
         conn.close()
         return (status, reason, body)
 
     def add_status(self, datetime, generated_energy, power=None):
-        params = {"d": datetime.strftime("%Y%m%d"),
-                  "t": datetime.strftime("%H:%M"),
-                  "v1": generated_energy}
+        params = {
+            "d": datetime.strftime("%Y%m%d"),
+            "t": datetime.strftime("%H:%M"),
+            "v1": generated_energy,
+        }
         if power is not None:
             params["v2"] = power
-        (status, reason, body) = self.send_request(
-            "/service/r2/addstatus.jsp", params)
+        (status, reason, body) = self.send_request("/service/r2/addstatus.jsp", params)
         if status != http.OK:
             logging.error("Failed to add status: %s", body)
             raise Exception("could not add status")
@@ -72,21 +74,27 @@ class PvOutput(object):
     def add_batch_status(self, statuses):
         data = []
         for status in statuses:
-            data.append(",".join([
-                status[0].strftime("%Y%m%d"),
-                status[0].strftime("%H:%M"),
-                str(status[2]), str(status[1])]))
+            data.append(
+                ",".join(
+                    [
+                        status[0].strftime("%Y%m%d"),
+                        status[0].strftime("%H:%M"),
+                        str(status[2]),
+                        str(status[1]),
+                    ]
+                )
+            )
         offset = 0
         while offset < len(data):
-            entries = data[offset:offset + 30]
+            entries = data[offset : offset + 30]
             (status, reason, body) = self.send_request(
-                "/service/r2/addbatchstatus.jsp",
-                {"data": ";".join(entries)})
+                "/service/r2/addbatchstatus.jsp", {"data": ";".join(entries)}
+            )
             if status == http.OK:
                 offset += len(entries)
                 if offset < len(data):
                     time.sleep(10)
-            elif (status == http.BAD_REQUEST and 'Load in progress' in body):
+            elif status == http.BAD_REQUEST and "Load in progress" in body:
                 time.sleep(20)
             else:
                 logging.error("Failed to add status batch: %s", body)
@@ -95,19 +103,20 @@ class PvOutput(object):
     def add_batch_output(self, data):
         offset = 0
         while offset < len(data):
-            entries = data[offset:offset + 30]
+            entries = data[offset : offset + 30]
             (status, reason, body) = self.send_request(
-                "/service/r2/addbatchoutput.jsp",
-                {"data": ";".join(entries)})
+                "/service/r2/addbatchoutput.jsp", {"data": ";".join(entries)}
+            )
             if status == http.OK:
                 offset += len(entries)
                 if offset < len(data):
                     time.sleep(10)
-            elif (status == http.BAD_REQUEST and 'Load in progress' in body):
+            elif status == http.BAD_REQUEST and "Load in progress" in body:
                 time.sleep(20)
             else:
                 logging.error("Failed to add output batch: %s", body)
                 raise Exception("could not add output batch")
+
 
 def get_data_for_day(plant, date):
     day = plant.day_overview(date)
@@ -124,9 +133,10 @@ def get_data_for_day(plant, date):
         data += ",,,%s,%s" % (peak.power, peak.timestamp.strftime("%H:%M"))
     return data
 
+
 def get_data_for_period(plant, start_date=None, end_date=None):
     if start_date is None:
-        start_date = plant.all_data('year').start_timestamp.date()
+        start_date = plant.all_data("year").start_timestamp.date()
     if end_date is None:
         end_date = date.today()
 
@@ -138,57 +148,61 @@ def get_data_for_period(plant, start_date=None, end_date=None):
         start_date = start_date + timedelta(days=1)
     return data
 
-def main():
-    logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s',
-                        level=logging.DEBUG)
 
-    parser = argparse.ArgumentParser(
-        description="Connect Sunny Portal to PVoutput.org")
-    parser.add_argument('config', help="Configuration file to use")
-    parser.add_argument('-s', '--status', help="Report current status",
-                        action="store_true")
-    parser.add_argument('-o', '--output', help="Report last output(s)",
-                        action="store_true")
-    parser.add_argument('-q', '--quiet', help="Silence output",
-                        action="store_true")
-    parser.add_argument('-n', '--dry-run', help="Don't send any data",
-                        action="store_true")
+def main():
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s: %(message)s", level=logging.DEBUG
+    )
+
+    parser = argparse.ArgumentParser(description="Connect Sunny Portal to PVoutput.org")
+    parser.add_argument("config", help="Configuration file to use")
+    parser.add_argument(
+        "-s", "--status", help="Report current status", action="store_true"
+    )
+    parser.add_argument(
+        "-o", "--output", help="Report last output(s)", action="store_true"
+    )
+    parser.add_argument("-q", "--quiet", help="Silence output", action="store_true")
+    parser.add_argument(
+        "-n", "--dry-run", help="Don't send any data", action="store_true"
+    )
     args = parser.parse_args()
 
     if args.quiet:
         logging.disable(logging.DEBUG)
 
     config = configparser.ConfigParser()
-    config['sunnyportal'] = {}
-    config['pvoutput'] = {}
+    config["sunnyportal"] = {}
+    config["pvoutput"] = {}
     config.read(args.config)
 
     modified = False
-    if not config['sunnyportal'].get('email'):
-        config['sunnyportal']['email'] = input("Sunny Portal e-mail: ")
+    if not config["sunnyportal"].get("email"):
+        config["sunnyportal"]["email"] = input("Sunny Portal e-mail: ")
         modified = True
-    if not config['sunnyportal'].get('password'):
-        config['sunnyportal']['password'] = getpass("Sunny Portal password: ")
+    if not config["sunnyportal"].get("password"):
+        config["sunnyportal"]["password"] = getpass("Sunny Portal password: ")
         modified = True
 
-    if not config['pvoutput'].get('apikey'):
-        config['pvoutput']['apikey'] = input("PVOutput API key: ")
+    if not config["pvoutput"].get("apikey"):
+        config["pvoutput"]["apikey"] = input("PVOutput API key: ")
         modified = True
-    if not config['pvoutput'].get('systemid'):
-        config['pvoutput']['systemid'] = input("PVOutput System Id: ")
+    if not config["pvoutput"].get("systemid"):
+        config["pvoutput"]["systemid"] = input("PVOutput System Id: ")
         modified = True
 
     if modified:
-        with open(args.config, 'w') as configfile:
+        with open(args.config, "w") as configfile:
             config.write(configfile)
 
     client = sunnyportal.client.Client(
-        config['sunnyportal']['email'], config['sunnyportal']['password'])
+        config["sunnyportal"]["email"], config["sunnyportal"]["password"]
+    )
     plant = client.get_plants()[0]
 
-    pvoutput = PvOutput(config['pvoutput']['apikey'],
-                        config['pvoutput']['systemid'],
-                        args.dry_run)
+    pvoutput = PvOutput(
+        config["pvoutput"]["apikey"], config["pvoutput"]["systemid"], args.dry_run
+    )
 
     if args.status:
         day = plant.day_overview(date.today())
@@ -209,5 +223,6 @@ def main():
 
     client.logout()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

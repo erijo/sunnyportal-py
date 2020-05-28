@@ -28,14 +28,14 @@ import urllib.parse
 
 
 class RequestBase(object):
-    def __init__(self, service, token=None, method='GET'):
+    def __init__(self, service, token=None, method="GET"):
         super().__init__()
         self.log = logging.getLogger(__name__)
         self.service = service
         self.token = token
         self.method = method
         self.version = 100
-        self.base_path = '/services'
+        self.base_path = "/services"
         self.url = None
 
     def get_timestamp(self, offset):
@@ -50,13 +50,13 @@ class RequestBase(object):
 
             ts = self.get_timestamp(self.token.server_offset)
             sig.update(ts.encode())
-            params['timestamp'] = ts
+            params["timestamp"] = ts
 
             sig.update(self.token.identifier.lower().encode())
 
-            params['signature-method'] = 'auth'
-            params['signature-version'] = self.version
-            params['signature'] = base64.standard_b64encode(sig.digest())
+            params["signature-method"] = "auth"
+            params["signature-version"] = self.version
+            params["signature"] = base64.standard_b64encode(sig.digest())
 
         self.url = "%s/%s/%d/" % (self.base_path, self.service, self.version)
         self.url += "/".join([urllib.parse.quote(s) for s in segments])
@@ -67,7 +67,7 @@ class RequestBase(object):
         self.log.debug("%s %s", method, url)
 
     def perform(self, connection):
-        assert(self.url is not None)
+        assert self.url is not None
 
         self.log_request(self.method, self.url)
         connection.request(self.method, self.url)
@@ -76,7 +76,9 @@ class RequestBase(object):
         if response.status != http.OK:
             raise RuntimeError(
                 "HTTP error performing {} request: {} {}".format(
-                    self.service, response.status, response.reason))
+                    self.service, response.status, response.reason
+                )
+            )
 
         data = response.read().decode("utf-8")
         return self.handle_response(data)
@@ -84,13 +86,13 @@ class RequestBase(object):
 
 class AuthenticationRequest(RequestBase):
     def __init__(self, username, password):
-        super().__init__(service='authentication')
+        super().__init__(service="authentication")
         self.password = password
-        self.prepare_url([username], {'password': password})
+        self.prepare_url([username], {"password": password})
 
     def log_request(self, method, url):
         password = urllib.parse.quote_plus(self.password)
-        super().log_request(method, url.replace(password, '<password>'))
+        super().log_request(method, url.replace(password, "<password>"))
 
     def handle_response(self, data):
         return responses.AuthenticationResponse(data)
@@ -98,8 +100,7 @@ class AuthenticationRequest(RequestBase):
 
 class LogoutRequest(RequestBase):
     def __init__(self, token):
-        super().__init__(service='authentication', token=token,
-                         method='DELETE')
+        super().__init__(service="authentication", token=token, method="DELETE")
         self.prepare_url([token.identifier])
 
     def handle_response(self, data):
@@ -108,7 +109,7 @@ class LogoutRequest(RequestBase):
 
 class PlantListRequest(RequestBase):
     def __init__(self, token):
-        super().__init__(service='plantlist', token=token)
+        super().__init__(service="plantlist", token=token)
         self.prepare_url([token.identifier])
 
     def handle_response(self, data):
@@ -117,15 +118,21 @@ class PlantListRequest(RequestBase):
 
 class PlantRequest(RequestBase):
     def __init__(self, token, oid, view):
-        super().__init__(service='plant', token=token)
-        self.prepare_url([oid], {'view': view, 'culture': 'en-gb',
-                                 'plant-image-size': '64px',
-                                 'identifier': token.identifier})
+        super().__init__(service="plant", token=token)
+        self.prepare_url(
+            [oid],
+            {
+                "view": view,
+                "culture": "en-gb",
+                "plant-image-size": "64px",
+                "identifier": token.identifier,
+            },
+        )
 
 
 class PlantProfileRequest(PlantRequest):
     def __init__(self, token, oid):
-        super().__init__(token, oid, 'profile')
+        super().__init__(token, oid, "profile")
 
     def handle_response(self, data):
         return responses.PlantProfileResponse(data)
@@ -133,8 +140,8 @@ class PlantProfileRequest(PlantRequest):
 
 class PlantDeviceListRequest(RequestBase):
     def __init__(self, token, oid):
-        super().__init__(service='device', token=token)
-        self.prepare_url([oid], {'identifier': token.identifier})
+        super().__init__(service="device", token=token)
+        self.prepare_url([oid], {"identifier": token.identifier})
 
     def handle_response(self, data):
         return responses.PlantDeviceListResponse(data)
@@ -142,15 +149,15 @@ class PlantDeviceListRequest(RequestBase):
 
 class PlantDeviceRequest(RequestBase):
     def __init__(self, token, plant_oid, device_oid, view, params={}):
-        super().__init__(service='device', token=token)
-        params['view'] = view
-        params['identifier'] = token.identifier
+        super().__init__(service="device", token=token)
+        params["view"] = view
+        params["identifier"] = token.identifier
         self.prepare_url([plant_oid, device_oid], params)
 
 
 class PlantDeviceParametersRequest(PlantDeviceRequest):
     def __init__(self, token, plant_oid, device_oid):
-        super().__init__(token, plant_oid, device_oid, view='parameter')
+        super().__init__(token, plant_oid, device_oid, view="parameter")
 
     def handle_response(self, data):
         return responses.PlantDeviceParametersResponse(data)
@@ -158,17 +165,16 @@ class PlantDeviceParametersRequest(PlantDeviceRequest):
 
 class DataRequest(RequestBase):
     def __init__(self, token, oid, data_type, date, params={}):
-        super().__init__(service='data', token=token)
-        params['culture'] = 'en-gb'
-        params['identifier'] = token.identifier
-        self.prepare_url([oid, data_type, date.strftime("%Y-%m-%d")],
-                         params)
+        super().__init__(service="data", token=token)
+        params["culture"] = "en-gb"
+        params["identifier"] = token.identifier
+        self.prepare_url([oid, data_type, date.strftime("%Y-%m-%d")], params)
 
 
 class LastDataExactRequest(DataRequest):
     def __init__(self, token, oid, date):
-        params = {'unit': 'kWh', 'view': 'lastdataexact'}
-        super().__init__(token, oid, 'Energy', date, params)
+        params = {"unit": "kWh", "view": "lastdataexact"}
+        super().__init__(token, oid, "Energy", date, params)
 
     def handle_response(self, data):
         return responses.LastDataExactResponse(data)
@@ -177,8 +183,8 @@ class LastDataExactRequest(DataRequest):
 class AllDataRequest(DataRequest):
     def __init__(self, token, oid, interval):
         """interval is year or month"""
-        params = {'period': 'infinite', 'interval': interval, 'unit': 'kWh'}
-        super().__init__(token, oid, 'Energy', datetime.today(), params)
+        params = {"period": "infinite", "interval": interval, "unit": "kWh"}
+        super().__init__(token, oid, "Energy", datetime.today(), params)
 
     def handle_response(self, data):
         return responses.AllDataResponse(data)
@@ -189,7 +195,7 @@ class DayOverviewRequest(DataRequest):
         self.quarter = quarter
         self.include_all = include_all
         data_type = "day-fifteen" if quarter else "day"
-        super().__init__(token, oid, 'overview-%s-total' % data_type, date)
+        super().__init__(token, oid, "overview-%s-total" % data_type, date)
 
     def handle_response(self, data):
         return responses.DayOverviewResponse(data, self.quarter, self.include_all)
@@ -197,7 +203,7 @@ class DayOverviewRequest(DataRequest):
 
 class MonthOverviewRequest(DataRequest):
     def __init__(self, token, oid, date):
-        super().__init__(token, oid, 'overview-month-total', date)
+        super().__init__(token, oid, "overview-month-total", date)
 
     def handle_response(self, data):
         return responses.MonthOverviewResponse(data)
@@ -205,7 +211,7 @@ class MonthOverviewRequest(DataRequest):
 
 class YearOverviewRequest(DataRequest):
     def __init__(self, token, oid, date):
-        super().__init__(token, oid, 'overview-year-total', date)
+        super().__init__(token, oid, "overview-year-total", date)
 
     def handle_response(self, data):
         return responses.YearOverviewResponse(data)
@@ -220,17 +226,16 @@ class EnergyBalanceRequest(RequestBase):
         - month: month, day, hour, fifteen
         - day: day, hour, fifteen
         """
-        super().__init__(service='data', token=token)
+        super().__init__(service="data", token=token)
         params = {
-            'period': period,
-            'interval': interval,
-            'culture': 'en-gb',
-            'identifier': token.identifier,
-            'unit': 'kWh',
+            "period": period,
+            "interval": interval,
+            "culture": "en-gb",
+            "identifier": token.identifier,
+            "unit": "kWh",
         }
         data_type = "energybalancetotal" if total else "energybalance"
-        self.prepare_url([oid, 'sets', data_type, date.strftime("%Y-%m-%d")],
-                         params)
+        self.prepare_url([oid, "sets", data_type, date.strftime("%Y-%m-%d")], params)
 
     def handle_response(self, data):
         return responses.EnergyBalanceResponse(data)
