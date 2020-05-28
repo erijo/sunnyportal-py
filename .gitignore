@@ -1,3 +1,10 @@
 *~
 __pycache__/
 *.config
+*.csv
+*.h5
+*.json
+*.feather
+*.parquet
+*.pkl
+*.xlsx
