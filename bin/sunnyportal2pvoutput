@@ -116,12 +116,12 @@ def get_data_for_day(plant, date):
     # Find peak hour and power
     peak = sunnyportal.responses.Power(None, 0, None, None)
     for measure in day.power_measurements:
-        if measure.mean_power > peak.mean_power:
+        if measure.power > peak.power:
             peak = measure
 
     data = "%s,%s" % (day.date.strftime("%Y%m%d"), day.difference)
     if peak.timestamp is not None:
-        data += ",,,%s,%s" % (peak.mean_power, peak.timestamp.strftime("%H:%M"))
+        data += ",,,%s,%s" % (peak.power, peak.timestamp.strftime("%H:%M"))
     return data
 
 def get_data_for_period(plant, start_date=None, end_date=None):
