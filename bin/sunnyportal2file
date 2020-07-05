@@ -34,7 +34,8 @@ def valid_date_type(arg_date_str):
     try:
         d = datetime.strptime(arg_date_str, "%Y-%m-%d").date()
         if d >= date.today():
-            # Sunny Portal will return values for the whole day, while setting future times as blank (interpreted as 0)
+            # Sunny Portal will return values for the whole day, while setting
+            # future times as blank (interpreted as 0)
             logging.debug(
                 f"Cannot look into the future ({d}), changing to yesterday..."
             )
@@ -103,6 +104,7 @@ class DataFrameSaver:
         if self.df.empty:
             logging.debug("Empty DataFrame. Nothing to save...")
             return
+
         file_name = self.get_file_name()
         logging.debug(f"Saving to file {file_name}")
         self.write_file(file_name)
@@ -229,7 +231,6 @@ df_saver_dict = {
 
 
 def get_df_saver(df, name, file_format):
-
     df_saver = df_saver_dict[file_format](df, name)
     logging.debug(f"{df_saver.__class__.__name__} fetched")
 
@@ -241,7 +242,6 @@ class DateError(Exception):
 
 
 def write_to_file(name, df, file_format, remove_zero=False, previous_file=None):
-
     df_saver = get_df_saver(df, name, file_format)
 
     if previous_file:
@@ -334,14 +334,15 @@ def get_data_for_period(plant, start_date, end_date):
 
     return df
 
+
 def get_plant_name(old_plant_name):
     """Replaces illegal characters in name with underscore (assumes worst case OS)"""
     replace_pattern = '[<>:"/|?*\\\\]'
-    plant_name = re.sub(replace_pattern , '_', old_plant_name)
+    plant_name = re.sub(replace_pattern, "_", old_plant_name)
 
     if plant_name != old_plant_name:
         logging.info(f"Plant name '{old_plant_name}' was converted to '{plant_name}'")
-    
+
     return plant_name
 
 
@@ -425,7 +426,6 @@ def main():
     )
 
     for plant in client.get_plants():
-        
         plant_name = get_plant_name(plant.name)
 
         if args.append:
