@@ -202,14 +202,37 @@ def main():
         config["pvoutput"]["systemid"] = input("PVOutput System Id: ")
         modified = True
 
+    client = sunnyportal.client.Client(
+        config["sunnyportal"]["email"], config["sunnyportal"]["password"]
+    )
+
+    plants = client.get_plants()
+    if not plants:
+        logging.error("No plant found")
+        sys.exit(1)
+
+    plant_oid = config["sunnyportal"].get("plant")
+    if not plant_oid:
+        index = 1
+        if len(plants) > 1:
+            print("Found %d plants" % len(plants))
+            for i, plant in enumerate(plants):
+                print("%d: %s" % (i + 1, plant.name))
+            index = int(input("Enter number for the plant to use: "))
+        plant_oid = plants[index - 1].oid
+        config["sunnyportal"]["plant"] = plant_oid
+        modified = True
+
     if modified:
         with open(args.config, "w") as configfile:
             config.write(configfile)
 
-    client = sunnyportal.client.Client(
-        config["sunnyportal"]["email"], config["sunnyportal"]["password"]
-    )
-    plant = client.get_plants()[0]
+    for plant in plants:
+        if plant.oid == plant_oid:
+            break
+    else:
+        logging.error("Configured plant not found")
+        sys.exit(1)
 
     pvoutput = PvOutput(
         config["pvoutput"]["apikey"], config["pvoutput"]["systemid"], args.dry_run
