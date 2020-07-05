@@ -116,6 +116,12 @@ class Plant(object):
         )
         return self.client.do_request(req)
 
+    def day_energy_balance(self, date):
+        req = requests.EnergyBalanceRequest(
+            self.get_token(), self.oid, date=date, period="day", interval="day"
+        )
+        return self.client.do_request(req)
+
 
 class Device(object):
     def __init__(self, client, plant, oid, name):

@@ -349,11 +349,17 @@ class EnergyBalanceResponse(DataResponse):
         tag = super().parse(data)
         tag = self.find_or_raise(tag, "energybalance")
 
+        if tag.get("unit") == "kWh":
+            converter = self.kwh_to_wh
+        else:
+            assert tag.get("unit") == "Wh"
+            converter = lambda wh: None if wh is None else int(float(wh))
+
         if tag.find("./*/month") is not None:
             self.months = []
             for entry in tag.iterfind("./*/month"):
                 date = self.parse_timestamp(entry, "%m/%Y")
-                b = self.parse_entry(entry, date)
+                b = self.parse_entry(entry, date, converter)
                 if b is not None:
                     self.months.append(b)
             print(self.months)
@@ -361,25 +367,29 @@ class EnergyBalanceResponse(DataResponse):
             self.days = []
             for entry in tag.iterfind("./*/day"):
                 date = self.parse_timestamp(entry, "%d/%m/%Y")
-                b = self.parse_entry(entry, date)
+                b = self.parse_entry(entry, date, converter)
                 if b is not None:
                     self.days.append(b)
+        elif tag.find("./day") is not None:
+            entry = tag.find("./day")
+            date = self.parse_timestamp(entry, "%d/%m/%Y")
+            self.day = self.parse_entry(entry, date, converter)
         else:
             raise NotImplementedError("unsupported response")
 
-    def parse_entry(self, entry, timestamp):
+    def parse_entry(self, entry, timestamp, converter):
         consumption = Consumption(
-            self.kwh_to_wh(entry.get("external-supply")),
-            self.kwh_to_wh(entry.get("self-supply")),
-            self.kwh_to_wh(entry.get("direct-consumption")),
+            converter(entry.get("external-supply")),
+            converter(entry.get("self-supply")),
+            converter(entry.get("direct-consumption")),
         )
         if any(m is None for m in consumption):
             return None
 
         generation = Generation(
-            self.kwh_to_wh(entry.get("pv-generation")),
-            self.kwh_to_wh(entry.get("self-consumption")),
-            self.kwh_to_wh(entry.get("feed-in")),
+            converter(entry.get("pv-generation")),
+            converter(entry.get("self-consumption")),
+            converter(entry.get("feed-in")),
         )
         if any(m is None for m in generation):
             return None
