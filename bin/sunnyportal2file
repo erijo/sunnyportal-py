@@ -334,6 +334,16 @@ def get_data_for_period(plant, start_date, end_date):
 
     return df
 
+def get_plant_name(old_plant_name):
+    """Replaces illegal characters in name with underscore (assumes worst case OS)"""
+    replace_pattern = '[<>:"/|?*\\\\]'
+    plant_name = re.sub(replace_pattern , '_', old_plant_name)
+
+    if plant_name != old_plant_name:
+        logging.info(f"Plant name '{old_plant_name}' was converted to '{plant_name}'")
+    
+    return plant_name
+
 
 def main():
     logging.basicConfig(
@@ -415,9 +425,11 @@ def main():
     )
 
     for plant in client.get_plants():
+        
+        plant_name = get_plant_name(plant.name)
 
         if args.append:
-            previous_file = extract_oldest_data_file(plant.name, args.format)
+            previous_file = extract_oldest_data_file(plant_name, args.format)
 
             if previous_file:
                 # Override start_date
@@ -432,20 +444,20 @@ def main():
                     return
             else:
                 logging.debug(
-                    f"File was not found for name {plant.name} and format {args.format}"
+                    f"File was not found for name {plant_name} and format {args.format}"
                 )
 
         logging.debug(
-            f"Extracting DataFrame from {start_date} to {args.end_date} for plant {plant.name}"
+            f"Extracting DataFrame from {start_date} to {args.end_date} for plant {plant_name}"
         )
         df = get_data_for_period(plant, start_date, args.end_date)
 
         if df.empty:
             logging.debug(
-                f"No data was found for plant {plant.name} between {start_date} and {args.end_date}"
+                f"No data was found for plant {plant_name} between {start_date} and {args.end_date}"
             )
         else:
-            write_to_file(plant.name, df, args.format, args.remove_zero, previous_file)
+            write_to_file(plant_name, df, args.format, args.remove_zero, previous_file)
 
     client.logout()
 
