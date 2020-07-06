@@ -122,24 +122,29 @@ def get_data_for_day(plant, date, get_consumption):
     day = plant.day_overview(date)
     if day.difference is None:
         return None
+
+    data = ["" for _ in range(11)]
+    data[0] = day.date.strftime("%Y%m%d")
+    data[1] = day.difference
+
     # Find peak hour and power
     peak = sunnyportal.responses.Power(None, 0, None, None)
     for measure in day.power_measurements:
         if measure.power > peak.power:
             peak = measure
 
-    data = "%s,%s" % (day.date.strftime("%Y%m%d"), day.difference)
+    if peak.timestamp is not None:
+        data[4] = peak.power
+        data[5] = peak.timestamp.strftime("%H:%M")
 
     if get_consumption:
         balance = plant.day_energy_balance(date).day
-        consumption = balance.consumption.external + balance.consumption.internal
-        data += ",%d,%d" % (balance.generation.feed_in, consumption)
+        data[2] = balance.generation.feed_in
+        data[3] = balance.consumption.external + balance.consumption.internal
+        # All import as "Import Peak"
+        data[10] = balance.consumption.external
 
-    if peak.timestamp is not None:
-        if not get_consumption:
-            data += ",,"
-        data += ",%s,%s" % (peak.power, peak.timestamp.strftime("%H:%M"))
-    return data
+    return ",".join(str(d) for d in data).rstrip(",")
 
 
 def get_data_for_period(plant, start_date=None, end_date=None, get_consumption=False):
