@@ -259,7 +259,7 @@ def main():
 
     if args.status:
         for i in reversed(range(0, args.days_past + 1)):
-            day = plant.day_overview(date.today() - timedelta(days=args.days_past))
+            day = plant.day_overview(date.today() - timedelta(days=i))
             if day.power_measurements:
                 data = []
                 energy = day.difference
