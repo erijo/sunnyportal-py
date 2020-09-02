@@ -8,3 +8,5 @@ __pycache__/
 *.parquet
 *.pkl
 *.xlsx
+# avoid sending private data to github
+*.config
