@@ -177,10 +177,10 @@ def main():
     parser = argparse.ArgumentParser(description="Connect Sunny Portal to PVoutput.org")
     parser.add_argument("config", help="Configuration file to use")
     parser.add_argument(
-        "-s", "--status", help="Report current status", action="store_true"
+        "-s", "--status", help="Report status(es)", action="store_true"
     )
     parser.add_argument(
-        "-o", "--output", help="Report last output(s)", action="store_true"
+        "-o", "--output", help="Report output(s)", action="store_true"
     )
     parser.add_argument(
         "-c", "--consumption", help="Report consumption", action="store_true"

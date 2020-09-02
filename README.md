@@ -27,8 +27,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -s, --status          Report current status
-  -o, --output          Report last output(s)
+  -s, --status          Report status(es)
+  -o, --output          Report output(s)
   -c, --consumption     Report consumption
   -p DAYS_PAST, --days-past DAYS_PAST
                         number of DAYS in the past to go back -- default: 0 (today only)
