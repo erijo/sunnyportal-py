@@ -18,19 +18,22 @@ credentials for Sunny Portal and the
 
 ```sh
 $ PYTHONPATH=. ./bin/sunnyportal2pvoutput sunnyportal.config --help
-usage: sunnyportal2pvoutput [-h] [-s] [-o] [-q] [-n] config
+usage: sunnyportal2pvoutput [-h] [-s] [-o] [-c] [-p DAYS_PAST] [-q] [-n] config
 
 Connect Sunny Portal to PVoutput.org
 
 positional arguments:
-  config         Configuration file to use
+  config                Configuration file to use
 
 optional arguments:
-  -h, --help     show this help message and exit
-  -s, --status   Report current status
-  -o, --output   Report last output(s)
-  -q, --quiet    Silence output
-  -n, --dry-run  Don't send any data
+  -h, --help            show this help message and exit
+  -s, --status          Report current status
+  -o, --output          Report last output(s)
+  -c, --consumption     Report consumption
+  -p DAYS_PAST, --days-past DAYS_PAST
+                        number of DAYS in the past to go back -- default: 0 (today only)
+  -q, --quiet           Silence output
+  -n, --dry-run         Don't send any data
 ```
 
 
