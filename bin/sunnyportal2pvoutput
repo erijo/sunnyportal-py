@@ -162,6 +162,13 @@ def get_data_for_period(plant, start_date=None, end_date=None, get_consumption=F
     return data
 
 
+def check_positive(value):
+    ivalue = int(value)
+    if ivalue <= 0:
+        raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
+    return ivalue
+
+
 def main():
     logging.basicConfig(
         format="%(asctime)s %(levelname)s: %(message)s", level=logging.DEBUG
@@ -170,13 +177,20 @@ def main():
     parser = argparse.ArgumentParser(description="Connect Sunny Portal to PVoutput.org")
     parser.add_argument("config", help="Configuration file to use")
     parser.add_argument(
-        "-s", "--status", help="Report current status", action="store_true"
+        "-s", "--status", help="Report status(es)", action="store_true"
     )
     parser.add_argument(
-        "-o", "--output", help="Report last output(s)", action="store_true"
+        "-o", "--output", help="Report output(s)", action="store_true"
     )
     parser.add_argument(
         "-c", "--consumption", help="Report consumption", action="store_true"
+    )
+    parser.add_argument(
+        "-p",
+        "--days-past",
+        help="number of DAYS in the past to go back -- default: 0 (today only)",
+        type=check_positive,
+        default=0,
     )
     parser.add_argument("-q", "--quiet", help="Silence output", action="store_true")
     parser.add_argument(
@@ -244,19 +258,20 @@ def main():
     )
 
     if args.status:
-        day = plant.day_overview(date.today())
-        if day.power_measurements:
-            data = []
-            energy = day.difference
-            for measure in reversed(day.power_measurements):
-                data.append((measure.timestamp, measure.power, energy))
-                energy -= int(measure.power / 4)
-            pvoutput.add_batch_status(list(reversed(data[0:16])))
-        elif day.difference is not None:
-            pvoutput.add_status(day.date, day.difference)
+        for i in reversed(range(0, args.days_past + 1)):
+            day = plant.day_overview(date.today() - timedelta(days=i))
+            if day.power_measurements:
+                data = []
+                energy = day.difference
+                for measure in reversed(day.power_measurements):
+                    data.append((measure.timestamp, measure.power, energy))
+                    energy -= int(measure.power / 4)
+                pvoutput.add_batch_status(list(reversed(data)))
+            elif day.difference is not None:
+                pvoutput.add_status(day.date, day.difference)
 
     if args.output:
-        start_date = date.today() - timedelta(days=7)
+        start_date = date.today() - timedelta(days=args.days_past)
         data = get_data_for_period(
             plant, start_date=start_date, get_consumption=args.consumption
         )
