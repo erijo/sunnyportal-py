@@ -19,6 +19,7 @@
 
 from datetime import date
 from getpass import getpass
+from html import unescape
 
 import configparser
 import logging
@@ -67,6 +68,9 @@ def main():
         # plant.day_overview(date(2016, 2, 3), quarter=False)
         # plant.month_overview(date(2016, 1, 1))
         # plant.year_overview(date(2016, 2, 1))
+        # for entry in plant.logbook(date(2016, 2, 1)).entries:
+        #    description = unescape(entry['description'])
+        #    print(f"{entry['date']} | {entry['type']} | {description}")
     client.logout()
 
 
