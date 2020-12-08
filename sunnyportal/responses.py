@@ -20,6 +20,7 @@ from datetime import datetime
 
 import logging
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import unescape
 
 
 class Error(Exception):
@@ -402,6 +403,8 @@ class LogbookResponse(ResponseBase):
         self.entries = []
         for e in super().parse(data).iterfind("entry"):
             device = self.find_or_raise(e, "device")
+            description = self.find_or_raise(e, "description").text
+            description = unescape(description, {"&apos;": "'", "&quot;": '"'})
             self.entries.append(
                 {
                     "event_id": self.get_or_raise(e, "event-id"),
@@ -410,7 +413,7 @@ class LogbookResponse(ResponseBase):
                     "id": self.find_or_raise(e, "id").text,
                     "type": self.find_or_raise(e, "type").text,
                     "status": self.find_or_raise(e, "status").text,
-                    "description": self.find_or_raise(e, "description").text,
+                    "description": description,
 
                     "device_oid": self.get_or_raise(device, "oid"),
                     "device_name": self.get_or_raise(device, "name"),
