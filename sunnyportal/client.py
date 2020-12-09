@@ -122,6 +122,12 @@ class Plant(object):
         )
         return self.client.do_request(req)
 
+    def logbook(self, date_from=None, info=True, warning=True, failure=True, error=True):
+        req = requests.LogbookRequest(
+            self.get_token(), self.oid, date_from, info, warning, failure, error
+        )
+        return self.client.do_request(req)
+
 
 class Device(object):
     def __init__(self, client, plant, oid, name):

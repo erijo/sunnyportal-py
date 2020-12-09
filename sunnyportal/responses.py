@@ -20,6 +20,7 @@ from datetime import datetime
 
 import logging
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import unescape
 
 
 class Error(Exception):
@@ -395,3 +396,32 @@ class EnergyBalanceResponse(DataResponse):
             return None
 
         return EnergyBalance(timestamp, consumption, generation)
+
+
+class LogbookResponse(ResponseBase):
+    def parse(self, data):
+        self.entries = []
+        for e in super().parse(data).iterfind("entry"):
+            device = self.find_or_raise(e, "device")
+
+            description = self.find_or_raise(e, "description").text
+            description = unescape(description, {"&apos;": "'", "&quot;": '"'})
+
+            event_date = self.find_or_raise(e, "date").text
+            event_date = datetime.strptime(event_date, "%d/%m/%Y %H:%M:%S")
+
+            self.entries.append(
+                {
+                    "event_id": self.get_or_raise(e, "event-id"),
+
+                    "date": event_date,
+                    "id": self.find_or_raise(e, "id").text,
+                    "type": self.find_or_raise(e, "type").text,
+                    "status": self.find_or_raise(e, "status").text,
+                    "description": description,
+
+                    "device_oid": self.get_or_raise(device, "oid"),
+                    "device_name": self.get_or_raise(device, "name"),
+                    "device_serial": self.get_or_raise(device, "serialnumber"),
+                }
+            )

@@ -239,3 +239,27 @@ class EnergyBalanceRequest(RequestBase):
 
     def handle_response(self, data):
         return responses.EnergyBalanceResponse(data)
+
+
+class LogbookRequest(RequestBase):
+    def __init__(self, token, oid, date_from=None, info=True, warning=True, failure=True, error=True):
+        super().__init__(service="eventlist", token=token)
+        params = {
+            "culture": "en-gb",
+            "identifier": token.identifier,
+            "confirmation": "unconfirmed",
+        }
+        if date_from:
+            params["date-from"] = date_from.strftime("%Y-%m-%d")
+        if info:
+            params["info"] = "true"
+        if warning:
+            params["warning"] = "true"
+        if failure:
+            params["disturbance"] = "true"
+        if error:
+            params["error"] = "true"
+        self.prepare_url([oid], params)
+
+    def handle_response(self, data):
+        return responses.LogbookResponse(data)
