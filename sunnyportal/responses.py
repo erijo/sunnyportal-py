@@ -413,13 +413,11 @@ class LogbookResponse(ResponseBase):
             self.entries.append(
                 {
                     "event_id": self.get_or_raise(e, "event-id"),
-
                     "date": event_date,
                     "id": self.find_or_raise(e, "id").text,
                     "type": self.find_or_raise(e, "type").text,
                     "status": self.find_or_raise(e, "status").text,
                     "description": description,
-
                     "device_oid": self.get_or_raise(device, "oid"),
                     "device_name": self.get_or_raise(device, "name"),
                     "device_serial": self.get_or_raise(device, "serialnumber"),

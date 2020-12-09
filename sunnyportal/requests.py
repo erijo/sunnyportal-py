@@ -242,7 +242,16 @@ class EnergyBalanceRequest(RequestBase):
 
 
 class LogbookRequest(RequestBase):
-    def __init__(self, token, oid, date_from=None, info=True, warning=True, failure=True, error=True):
+    def __init__(
+        self,
+        token,
+        oid,
+        date_from=None,
+        info=True,
+        warning=True,
+        failure=True,
+        error=True,
+    ):
         super().__init__(service="eventlist", token=token)
         params = {
             "culture": "en-gb",
