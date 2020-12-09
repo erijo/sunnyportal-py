@@ -403,13 +403,18 @@ class LogbookResponse(ResponseBase):
         self.entries = []
         for e in super().parse(data).iterfind("entry"):
             device = self.find_or_raise(e, "device")
+
             description = self.find_or_raise(e, "description").text
             description = unescape(description, {"&apos;": "'", "&quot;": '"'})
+
+            event_date = self.find_or_raise(e, "date").text
+            event_date = datetime.strptime(event_date, "%d/%m/%Y %H:%M:%S")
+
             self.entries.append(
                 {
                     "event_id": self.get_or_raise(e, "event-id"),
 
-                    "date": self.find_or_raise(e, "date").text,
+                    "date": event_date,
                     "id": self.find_or_raise(e, "id").text,
                     "type": self.find_or_raise(e, "type").text,
                     "status": self.find_or_raise(e, "status").text,
