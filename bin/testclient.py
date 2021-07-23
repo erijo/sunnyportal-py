@@ -17,18 +17,22 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-from datetime import date
+"""A simple client using the sunnyportal-py library."""
+
+from datetime import date, timedelta
 from getpass import getpass
 
 import configparser
 import logging
 import sys
+import time
 import sunnyportal.client
 
 
 def main():
+    """Main."""
     logging.basicConfig(
-        format="%(asctime)s %(levelname)s: %(message)s", level=logging.DEBUG
+        format="%(asctime)s %(levelname)s: %(message)s", level=logging.INFO
     )
 
     if len(sys.argv) != 2:
@@ -40,35 +44,37 @@ def main():
     config[section] = {}
     config.read(sys.argv[1])
 
+    if not config[section].get('plant'):
+        config[section]['plant'] = input("Plant: ")
     if not config[section].get("email"):
         config[section]["email"] = input("E-mail: ")
     if not config[section].get("password"):
         config[section]["password"] = getpass()
 
-    with open(sys.argv[1], "w") as f:
-        config.write(f)
+    with open(sys.argv[1], "w") as file:
+        config.write(file)
 
     client = sunnyportal.client.Client(
         config[section]["email"], config[section]["password"]
     )
 
     for plant in client.get_plants():
-        logging.info("Found plant %s", plant.name)
-        # plant.profile()
-        # plant.year_energy_balance(date(2020,4,1))
-        # plant.month_energy_balance(date(2020,4,1))
-        # plant.last_data_exact(date.today())
-        # for device in plant.get_devices():
-        #    for name, param in device.get_parameters().parameters.items():
-        #        print(f"{name} = {param.value} (changed {param.changed})")
-        # plant.all_data('year')
-        # plant.all_data('month')
-        # plant.day_overview(date(2016, 2, 3))
-        # plant.day_overview(date(2016, 2, 3), quarter=False)
-        # plant.month_overview(date(2016, 1, 1))
-        # plant.year_overview(date(2016, 2, 1))
-        # for entry in plant.logbook(date(2016, 2, 1)).entries:
-        #    print(f"{entry['date']} | {entry['type']} | {entry['description']}")
+        if plant.name == config[section]['plant']:
+            logging.debug("Found plant %s", plant.name)
+
+            # Fetch all generation data for 2020, for example
+            start_date = date(2020, 1, 1)
+            end_date = date(2021, 1, 1)
+            delta = timedelta(days=1)
+            # Be a good client
+            time.sleep(5)
+
+            while start_date <= end_date:
+                day = plant.day_overview(start_date)
+                for power in day.power_measurements:
+                    print(power.timestamp, power.power)
+                start_date += delta
+
     client.logout()
 
 
