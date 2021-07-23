@@ -64,7 +64,7 @@ def main():
 
             # Fetch all generation data for 2020, for example
             start_date = date(2020, 1, 1)
-            end_date = date(2021, 1, 1)
+            end_date = date(2020, 12, 31)
             delta = timedelta(days=1)
             # Be a good client
             time.sleep(5)
