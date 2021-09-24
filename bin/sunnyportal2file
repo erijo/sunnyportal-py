@@ -46,305 +46,265 @@ def valid_date_type(arg_date_str):
         raise argparse.ArgumentTypeError(msg)
 
 
-class DataFrameSaver:
-    def __init__(self, df, name, file_format):
-        self.df = df
-        self.name = name
-        self.file_extension = self.file_extension_dict[file_format]
-        self.previous_files = []
+class DataFrameHandler:
 
-    file_extension_dict = {
+    def __init__(self, plant, start_date, end_date, format):
+        self._plant = plant
+        self._plant_name = self._fix_plant_name(plant.name)
+        self._file_extension = self._file_extension_dict[format]
+        self._file_name = f"{self._plant_name}.{self._file_extension}" 
+        self._start_date = start_date
+        self._end_date = end_date
+        self._old_df = pd.DataFrame()
+        self._new_df = pd.DataFrame()
+
+    _file_extension_dict = {
         "json": "json",
         "pickle": "pkl",
         "csv": "csv",
-        "hdf": "h5",
         "feather": "feather",
         "parquet": "parquet",
         "excel": "xlsx",
+        "sqlite":"db"
     }
+    
     # Assuming the power in W is always an integer
-    dtype_dict = {
+    _dtype_dict = {
         "timestamp": np.datetime64,
         "mean_power": np.uint32,
         "min_power": np.uint32,
         "max_power": np.uint32,
     }
 
-    def get_file_name(self):
-        start_date = np.amin(self.df["timestamp"]).strftime("%Y-%m-%d")
-        end_date = np.amax(self.df["timestamp"]).strftime("%Y-%m-%d")
-        return f"{self.name}_from_{start_date}_to_{end_date}.{self.file_extension}"
+    def _get_data_for_day(self, date):
+        day = self._plant.day_overview(date, include_all=True)
+        return day.power_measurements
 
-    def remove_zero_elements(self):
-        mask = self.df["mean_power"] > 0
-        logging.debug(
-            f"Removing rows with zero production from DataFrame ({np.sum(mask)} rows)"
-        )
-        self.df = self.df.loc[mask].reset_index(drop=True)
+    def _set_dtype(self, df):
+        dtypes = {k: self._dtype_dict[k] for k in df.columns}
+        return df.astype(dtypes)
 
-    def read_file(self, file_name):
+    def download_new_data(self):
+        """Extracts data for the period between self._start_date and self._end_date"""
+        
+        start_date = self._start_date
+        
+        if start_date > self._end_date:
+            logging.debug(f"start_date {start_date} cannot be larger than end_date {self._end_date}")
+            self._new_df = pd.DataFrame()
+            return
+
+        timestamp = []
+        min_power = []
+        mean_power = []
+        max_power = []
+
+        while start_date <= self._end_date:
+            res = self._get_data_for_day(start_date)
+            if res:
+                for power_measurement in res:
+                    timestamp.append(power_measurement.timestamp)
+                    min_power.append(power_measurement.min)
+                    mean_power.append(power_measurement.power)
+                    max_power.append(power_measurement.max)
+
+            start_date = start_date + timedelta(days=1)
+
+        data_dict = {}
+        data_dict["timestamp"] = timestamp
+
+        if any(min_power):
+            data_dict["min_power"] = min_power
+
+        if any(mean_power):
+            data_dict["mean_power"] = mean_power
+
+        if any(max_power):
+            data_dict["max_power"] = max_power
+
+        if not timestamp:
+            self._new_df = pd.DataFrame()
+            return
+
+
+        # from_dict dtype does not seem to work properly, use astype instead
+        dtypes = {k: self._dtype_dict[k] for k in data_dict.keys()}
+        df = pd.DataFrame.from_dict(data_dict).fillna(0).astype(dtypes)
+
+        self._new_df = df
+
+    def prepare(self):
+        """Reads old data, if needed, and sets new start date accordingly.
+        Some subclasses of DataFrameHandler might need to override this method."""
+        
+
+        if os.path.isfile(self._file_name):
+            logging.debug(f"Reading old dataframe from file {self._file_name}")
+            self._old_df = self._read_df()
+
+            old_end_date = np.amax(self._old_df["timestamp"]).date()
+            
+            if old_end_date > self._start_date:
+                self._start_date = old_end_date + timedelta(days=1)
+                logging.debug(f"New start_date {self._start_date} was extracted from file {self._file_name}")
+
+    def _fix_plant_name(self, old_plant_name):
+        """Replaces potentially illegal characters in name with underscore (assumes worst case OS)"""
+        replace_pattern = '[<>:"/|?*\\\\]'
+        plant_name = re.sub(replace_pattern, "_", old_plant_name)
+
+        if plant_name != old_plant_name:
+            logging.info(f"Plant name '{old_plant_name}' was converted to '{plant_name}'")
+        return plant_name
+
+    def _merge_dataframes(self):
+        """Combines old and new data, if applicable"""
+
+        if ((not self._old_df.empty) & (not self._new_df.empty)):
+            logging.debug(f"Merging old and new data")
+            self._df = pd.concat([self._old_df, self._new_df], axis=0).reset_index(drop=True) #.sort_values('timestamp', ignore_index=True)
+        elif (not self._new_df.empty):
+            logging.debug(f"Only new data, no need to merge")
+            self._df = self._new_df
+        else:
+            self._df = pd.DataFrame()
+
+    def _read_df(self):
         pass
 
-    def write_file(self, file_name):
+    def _write_df(self):
         pass
 
-    def append(self, file_name):
-        logging.debug(f"Reading old dataframe from file {file_name}")
-        df_old = self.read_file(file_name)
-        dtype_dict = {k: self.dtype_dict[k] for k in df_old.columns.values}
-        df_old = df_old.astype(dtype_dict)
+    def save_data(self):
+        """Saves data to file/database"""
 
-        self.df = pd.concat([df_old, self.df]).reset_index(drop=True)
-        self.previous_files.append(file_name)
+        # Merge the old and new data (if applicable)
+        self._merge_dataframes()
 
-    def save_to_file(self, remove_zero=False):
-        if remove_zero:
-            self.remove_zero_elements()
-
-        if self.df.empty:
+        if self._df.empty:
             logging.debug("Empty DataFrame. Nothing to save...")
             return
 
-        file_name = self.get_file_name()
-        logging.debug(f"Saving to file {file_name}")
-        self.write_file(file_name)
+        
+        logging.info(f"Saving to file {self._file_name}")
+        self._write_df()
 
-        # Delete old files
-        for old_file in self.previous_files:
-            os.remove(old_file)
-            logging.debug(f"File {old_file} was deleted.")
-
-
-class PickleSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        super().__init__(df, name, file_format="pickle")
+class PickleHandler(DataFrameHandler):
+    def __init__(self, plant, start_date, end_date):
+        super().__init__(plant, start_date, end_date, format='pickle')
         self.kwargs = {}
 
-    def read_file(self, file_name):
-        return pd.read_pickle(file_name, **self.kwargs)
+    def _read_df(self):
+        return pd.read_pickle(self._file_name, **self.kwargs)
 
-    def write_file(self, file_name):
-        self.df.to_pickle(file_name, **self.kwargs)
+    def _write_df(self):
+        self._df.to_pickle(self._file_name, **self.kwargs)
 
-
-class JSONSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        super().__init__(df, name, file_format="json")
+class JSONHandler(DataFrameHandler):
+    def __init__(self, plant, start_date, end_date):
+        super().__init__(plant, start_date, end_date, format='json')
         # Change json format below
         self.kwargs = {"orient": "table"}
 
-    def read_file(self, file_name):
-        return pd.read_json(file_name, **self.kwargs)
+    def _read_df(self):
+        return self._set_dtype(pd.read_json(self._file_name,**self.kwargs))
 
-    def write_file(self, file_name):
-        self.df.to_json(file_name, index=False, **self.kwargs)
+    def _write_df(self):
+        self._df.to_json(self._file_name, index=False, **self.kwargs)
 
-
-class CSVSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        super().__init__(df, name, file_format="csv")
+class CSVHandler(DataFrameHandler):
+    def __init__(self, plant, start_date, end_date):
+        super().__init__(plant, start_date, end_date, format='csv')
         self.kwargs = {}
 
-    def read_file(self, file_name):
-        return pd.read_csv(file_name, parse_dates=["timestamp"], **self.kwargs)
+    def _read_df(self):
+        return self._set_dtype(pd.read_csv(self._file_name, parse_dates=["timestamp"], **self.kwargs))
 
-    def write_file(self, file_name):
-        self.df.to_csv(file_name, index=False, **self.kwargs)
+    def _write_df(self):
+        self._df.to_csv(self._file_name, index=False, **self.kwargs)
 
-
-class HDFSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        super().__init__(df, name, file_format="hdf")
-        self.kwargs = {"key": "df"}
-
-    def read_file(self, file_name):
-        return pd.read_hdf(file_name, **self.kwargs)
-
-    def write_file(self, file_name):
-        self.df.to_hdf(file_name, mode="w", **self.kwargs)
-
-
-class ParquetSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        super().__init__(df, name, file_format="parquet")
+class ParquetHandler(DataFrameHandler):
+    def __init__(self, plant, start_date, end_date):
+        super().__init__(plant, start_date, end_date, format='parquet')
         self.kwargs = {}
 
-    def read_file(self, file_name):
-        return pd.read_parquet(file_name, **self.kwargs)
+    def _read_df(self):
+        return self._set_dtype(pd.read_parquet(self._file_name, **self.kwargs))
 
-    def write_file(self, file_name):
-        self.df.to_parquet(file_name, **self.kwargs)
+    def _write_df(self):
+        self._df.to_parquet(self._file_name, **self.kwargs)
 
+class SQLiteHandler(DataFrameHandler):
+    def __init__(self, plant, start_date, end_date):
+        import sqlite3
 
-class SQLSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        raise NotImplementedError("sql details not setup")
-        from sqlalchemy import create_engine
+        super().__init__(plant, start_date, end_date, format='sqlite')
+        self._file_name = 'sunny_portal.db'
+        self._conn = sqlite3.connect(self._file_name)
+        self._c = self._conn.cursor()
 
-        super().__init__(df, name, file_format="sql")
-        self.engine = create_engine("sqlite://", echo=False)
-        self.kwargs = {"con": self.engine}
+    def __table_exists(self):
+        return self._c.execute(f'''SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{self._plant_name}' ''').fetchone()[0]
 
-    def read_file(self, file_name):
-        return pd.read_sql(file_name, **self.kwargs)
+    def prepare(self):
+        """No need to read the old data as dataframe in SQL. Just extract the latest date"""
+        
+        if os.path.isfile(self._file_name) & self.__table_exists():
+            logging.debug(f"Extracting latest date from database {self._file_name}")
+            old_end_date = datetime.strptime(\
+                self._conn.execute(\
+                    f'SELECT MAX(timestamp) FROM "{self._plant_name}"').fetchone()[0], "%Y-%m-%d %H:%M:%S").date()
+            
 
-    def write_file(self, file_name):
-        raise NotImplementedError("sql details not setup")
-        engine = create_engine("sqlite://", echo=False)
-        df.to_sql(file_name, index=False, **self.kwargs)
+            if old_end_date > self._start_date:
+                self._start_date = old_end_date + timedelta(days=1)
+                logging.debug(\
+                    f"New start_date {self._start_date} was extracted from file {self._file_name} and table {self._plant_name}")
 
+    def _read_df(self):
+        return self._set_dtype(pd.read_sql(f'SELECT * FROM {self._plant_name}', con=self._conn))
 
-class FeatherSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        super().__init__(df, name, file_format="feather")
+    def _write_df(self):
+        self._df.to_sql(self._plant_name, con=self._conn, index=False, if_exists='append')
+
+class FeatherHandler(DataFrameHandler):
+    def __init__(self, plant, start_date, end_date):
+        super().__init__(plant, start_date, end_date, format='feather')
         self.kwargs = {}
 
-    def read_file(self, file_name):
-        return pd.read_feather(file_name, **self.kwargs)
+    def _read_df(self):
+        return pd.read_feather(self._file_name, **self.kwargs)
 
-    def write_file(self, file_name):
-        self.df.to_feather(file_name, **self.kwargs)
+    def _write_df(self):
+        self._df.to_feather(self._file_name, **self.kwargs)
 
-
-class ExcelSaver(DataFrameSaver):
-    def __init__(self, df, name):
-        super().__init__(df, name, file_format="excel")
+class ExcelHandler(DataFrameHandler):
+    def __init__(self, plant, start_date, end_date):
+        super().__init__(plant, start_date, end_date, format='excel')
         self.kwargs = {}
 
-    def read_file(self, file_name):
-        return pd.read_excel(file_name, **self.kwargs)
+    def _read_df(self):
+        return pd.read_excel(self._file_name, dtype=self._dtype_dict, **self.kwargs)
 
-    def write_file(self, file_name):
-        self.df.to_excel(file_name, index=False, **self.kwargs)
+    def _write_df(self):
+        self._df.to_excel(self._file_name, index=False, **self.kwargs)
 
-
-df_saver_dict = {
-    "json": JSONSaver,
-    "pickle": PickleSaver,
-    "csv": CSVSaver,
-    "hdf": HDFSaver,
-    "feather": FeatherSaver,
-    "sql": SQLSaver,
-    "parquet": ParquetSaver,
-    "excel": ExcelSaver,
+df_Handler_dict = {
+    "json": JSONHandler,
+    "pickle": PickleHandler,
+    "csv": CSVHandler,
+    "feather": FeatherHandler,
+    "parquet": ParquetHandler,
+    "excel": ExcelHandler,
+    "sqlite":SQLiteHandler
 }
 
 
-def get_df_saver(df, name, file_format):
-    df_saver = df_saver_dict[file_format](df, name)
-    logging.debug(f"{df_saver.__class__.__name__} fetched")
+def get_df_handler(plant, format, start_date, end_date):
+    df_handler = df_Handler_dict[format](plant, start_date, end_date)
+    logging.debug(f"Initialized {df_handler.__class__.__name__} object")
 
-    return df_saver
-
-
-class DateError(Exception):
-    pass
-
-
-def write_to_file(name, df, file_format, remove_zero=False, previous_file=None):
-    df_saver = get_df_saver(df, name, file_format)
-
-    if previous_file:
-        df_saver.append(previous_file)
-
-    df_saver.save_to_file(remove_zero)
-
-
-def extract_oldest_data_file(name, file_format):
-    """Extract the file name of the file which has the oldest start date of a format file_format.
-
-
-    If tied for the oldest file, pick the one with the newest end date
-
-    """
-    oldest_file = None
-    candidates = []
-    start_dates = []
-
-    regex = re.compile(
-        name
-        + "_from_\d{4}-\d{2}-\d{2}_to_\d{4}-\d{2}-\d{2}[.]"
-        + DataFrameSaver.file_extension_dict[file_format]
-    )
-    for this_file in os.listdir("."):
-        if regex.match(this_file):
-            candidates.append(this_file)
-            start_dates.append(extract_date(this_file, "from"))
-
-    start_dates = np.array(start_dates)
-    candidates = np.array(candidates)
-    if candidates.size:
-        mask = start_dates == np.amin(start_dates)
-        oldest_file = sorted(candidates[mask])[-1]
-
-    return oldest_file
-
-
-def get_data_for_day(plant, date):
-    day = plant.day_overview(date, include_all=True)
-    return day.power_measurements
-
-
-def extract_date(file_str, tag):
-    m = re.search(
-        tag + "_(?P<year>\d{4})-(?P<month>\d{1,2})-(?P<day>\d{1,2})", file_str
-    )
-    return date(int(m.group("year")), int(m.group("month")), int(m.group("day")))
-
-
-def get_data_for_period(plant, start_date, end_date):
-    if start_date > end_date:
-        raise DateError(
-            f"start_date {start_date} cannot be larger than end_date {end_date}"
-        )
-
-    timestamp = []
-    min_power = []
-    mean_power = []
-    max_power = []
-
-    while start_date <= end_date:
-        res = get_data_for_day(plant, start_date)
-        if res:
-            for power_measurement in res:
-                timestamp.append(power_measurement.timestamp)
-                min_power.append(power_measurement.min)
-                mean_power.append(power_measurement.power)
-                max_power.append(power_measurement.max)
-
-        start_date = start_date + timedelta(days=1)
-
-    data_dict = {}
-    data_dict["timestamp"] = timestamp
-
-    if any(min_power):
-        data_dict["min_power"] = min_power
-
-    if any(mean_power):
-        data_dict["mean_power"] = mean_power
-
-    if any(max_power):
-        data_dict["max_power"] = max_power
-
-    if not timestamp:
-        return pd.DataFrame([])
-
-    dtypes = {k: DataFrameSaver.dtype_dict[k] for k in data_dict.keys()}
-    df = pd.DataFrame.from_dict(data_dict).fillna(0).astype(dtypes)
-
-    return df
-
-
-def get_plant_name(old_plant_name):
-    """Replaces illegal characters in name with underscore (assumes worst case OS)"""
-    replace_pattern = '[<>:"/|?*\\\\]'
-    plant_name = re.sub(replace_pattern, "_", old_plant_name)
-
-    if plant_name != old_plant_name:
-        logging.info(f"Plant name '{old_plant_name}' was converted to '{plant_name}'")
-
-    return plant_name
-
+    return df_handler
 
 def main():
     logging.basicConfig(
@@ -359,7 +319,7 @@ def main():
     parser.add_argument(
         "-f",
         "--format",
-        choices=["json", "csv", "pickle", "hdf", "feather", "parquet", "excel"],
+        choices=["json", "csv", "pickle", "feather", "parquet", "excel", "sqlite"],
         required=True,
         help="Format for which the data is to be saved",
     )
@@ -381,26 +341,9 @@ def main():
         help="The end date of data to be saved in the format YYYY-MM-DD (default yesterday)",
     )
 
-    parser.add_argument(
-        "-r",
-        "--remove-zero",
-        help="Remove data with timestamps with no production before saving",
-        action="store_true",
-    )
-
     parser.add_argument("-q", "--quiet", help="Silence output", action="store_true")
 
-    parser.add_argument(
-        "-a",
-        "--append",
-        help="Extract only new data (overrides start-date) and append it with the data in existing file with the same format",
-        action="store_true",
-    )
-
     args = parser.parse_args()
-
-    previous_file = None
-    start_date = args.start_date
 
     if args.quiet:
         logging.disable(logging.DEBUG)
@@ -426,38 +369,18 @@ def main():
     )
 
     for plant in client.get_plants():
-        plant_name = get_plant_name(plant.name)
+        
+        df_handler = get_df_handler(plant, args.format, args.start_date, args.end_date)
 
-        if args.append:
-            previous_file = extract_oldest_data_file(plant_name, args.format)
+        # Prepare the df_handler where start date might be adjusted if
+        # data already exists. For some formats, old data will be read.
+        df_handler.prepare()
 
-            if previous_file:
-                # Override start_date
-                start_date = extract_date(previous_file, "to") + timedelta(days=1)
-                logging.debug(
-                    f"New start_date {start_date} was extracted from file {previous_file}"
-                )
-                if start_date > args.end_date:
-                    logging.debug(
-                        f"New start_date {start_date} was larger than end_date {args.end_date}. Nothing more to do..."
-                    )
-                    return
-            else:
-                logging.debug(
-                    f"File was not found for name {plant_name} and format {args.format}"
-                )
+        # Downloads new data
+        df_handler.download_new_data()
 
-        logging.debug(
-            f"Extracting DataFrame from {start_date} to {args.end_date} for plant {plant_name}"
-        )
-        df = get_data_for_period(plant, start_date, args.end_date)
-
-        if df.empty:
-            logging.debug(
-                f"No data was found for plant {plant_name} between {start_date} and {args.end_date}"
-            )
-        else:
-            write_to_file(plant_name, df, args.format, args.remove_zero, previous_file)
+        # Save the data to file/databse
+        df_handler.save_data()
 
     client.logout()
 
