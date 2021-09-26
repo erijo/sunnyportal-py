@@ -76,7 +76,7 @@ class DataFrameHandler:
         "max_power": np.uint32,
     }
 
-    def _get_data_for_day(self, date):
+    def _get_power_measurements_for_day(self, date):
         day = self._plant.day_overview(date, include_all=True)
         return day.power_measurements
 
@@ -94,44 +94,32 @@ class DataFrameHandler:
             self._new_df = pd.DataFrame()
             return
 
-        timestamp = []
-        min_power = []
-        mean_power = []
-        max_power = []
+        data = []
 
         while start_date <= self._end_date:
-            res = self._get_data_for_day(start_date)
+            res = self._get_power_measurements_for_day(start_date)
             if res:
-                for power_measurement in res:
-                    timestamp.append(power_measurement.timestamp)
-                    min_power.append(power_measurement.min)
-                    mean_power.append(power_measurement.power)
-                    max_power.append(power_measurement.max)
-
+                data.append(pd.DataFrame(res)) # The column names will be taken from the namedtuple fields
+            
             start_date = start_date + timedelta(days=1)
 
-        data_dict = {}
-        data_dict["timestamp"] = timestamp
+        # Concatenate the dataframes, remove columns without values (eg. missing min, max),
+        # replace NaN with 0 and rename the columns, reset the index and set the resulting
+        # dtypes according to _dtype_dict.
+        translation_dict = {"power": "mean_power", "min":"min_power", "max":"max_power"}
 
-        if any(min_power):
-            data_dict["min_power"] = min_power
+        if(data):
+            df = pd.concat(data).\
+                dropna(axis=1, how='all').\
+                    fillna(0).\
+                        rename(columns=translation_dict).\
+                            reset_index(drop=True)
 
-        if any(mean_power):
-            data_dict["mean_power"] = mean_power
+            self._new_df = df.astype({k: self._dtype_dict[k] for k in df.columns})
 
-        if any(max_power):
-            data_dict["max_power"] = max_power
-
-        if not timestamp:
+        else:
+            logging.debug(f"No data found between {self._start_date} and {self._end_date}")
             self._new_df = pd.DataFrame()
-            return
-
-
-        # from_dict dtype does not seem to work properly, use astype instead
-        dtypes = {k: self._dtype_dict[k] for k in data_dict.keys()}
-        df = pd.DataFrame.from_dict(data_dict).fillna(0).astype(dtypes)
-
-        self._new_df = df
 
     def prepare(self):
         """Reads old data, if needed, and sets new start date accordingly.
@@ -341,6 +329,15 @@ def main():
         help="The end date of data to be saved in the format YYYY-MM-DD (default yesterday)",
     )
 
+    parser.add_argument(
+        "-i",
+        "--include-filter",
+        type=str,
+        default='',
+        required=False,
+        help="A string used to filter which plants to include (default includes all plants)",
+    )
+
     parser.add_argument("-q", "--quiet", help="Silence output", action="store_true")
 
     args = parser.parse_args()
@@ -369,19 +366,21 @@ def main():
     )
 
     for plant in client.get_plants():
-        
-        df_handler = get_df_handler(plant, args.format, args.start_date, args.end_date)
+        if(plant.name.startswith(args.include_filter)):
 
-        # Prepare the df_handler where start date might be adjusted if
-        # data already exists. For some formats, old data will be read.
-        df_handler.prepare()
+            df_handler = get_df_handler(plant, args.format, args.start_date, args.end_date)
 
-        # Downloads new data
-        df_handler.download_new_data()
+            # Prepare the df_handler where start date might be adjusted if
+            # data already exists. For some formats, old data will be read.
+            df_handler.prepare()
 
-        # Save the data to file/databse
-        df_handler.save_data()
+            # Downloads new data
+            df_handler.download_new_data()
 
+            # Save the data to file/databse
+            df_handler.save_data()
+        else:
+            logging.debug(f'Plant {plant.name} does not match include filter "{args.include_filter}"')
     client.logout()
 
 
