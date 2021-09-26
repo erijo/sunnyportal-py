@@ -53,12 +53,13 @@ for Sunny Portal. It will extract the fields (min, mean and max production) whic
 3. Enter the requested information and verify that a file was created with the format you specified with the expected content
 4. Once it works, you can specify a different start date with --start-date, and end date with --end-date (both defaults to yesterday)
 5. If a data file already exists, it will only download new data and append to previously created data file (can override --start-date)
-6. Add --quiet to silence the output.
+6. Use --include-filter if you only want to download data for a specific plant
+7. Add --quiet to silence the output.
 
 
 ```sh
 $ PYTHONPATH=. ./bin/sunnyportal2file -h
-usage: sunnyportal2file [-h] -f {json,csv,pickle,feather,parquet,excel,sqlite} [-s START_DATE] [-e END_DATE] [-q] config
+usage: sunnyportal2file [-h] -f {json,csv,pickle,feather,parquet,excel,sqlite} [-s START_DATE] [-e END_DATE] [-i INCLUDE_FILTER] [-q] config
 
 Save information from Sunny Portal to file
 
@@ -73,5 +74,7 @@ optional arguments:
                         The start date of data to be saved in the format YYYY-MM-DD (default yesterday)
   -e END_DATE, --end-date END_DATE
                         The end date of data to be saved in the format YYYY-MM-DD (default yesterday)
+  -i INCLUDE_FILTER, --include-filter INCLUDE_FILTER
+                        A string used to filter which plants to include (default includes all plants)
   -q, --quiet           Silence output
 ```
