@@ -102,10 +102,11 @@ class PvOutput(object):
 
     def add_batch_output(self, data):
         offset = 0
+        batch_size = 100
         while offset < len(data):
-            entries = data[offset : offset + 30]
+            entries = data[offset : offset + batch_size]
             (status, reason, body) = self.send_request(
-                "/service/r2/addbatchoutput.jsp", {"data": ";".join(entries)}
+                "/service/r2/addoutput.jsp", {"data": ";".join(entries)}
             )
             if status == http.OK:
                 offset += len(entries)
@@ -113,6 +114,9 @@ class PvOutput(object):
                     time.sleep(10)
             elif status == http.BAD_REQUEST and "Load in progress" in body:
                 time.sleep(20)
+            elif batch_size > 1:
+                # Retry with a single entry in case it fails due to missing donation mode
+                batch_size = 1
             else:
                 logging.error("Failed to add output batch: %s", body)
                 raise Exception("could not add output batch")
