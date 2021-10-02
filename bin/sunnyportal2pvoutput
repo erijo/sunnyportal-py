@@ -114,7 +114,7 @@ class PvOutput(object):
                     time.sleep(10)
             elif status == http.BAD_REQUEST and "Load in progress" in body:
                 time.sleep(20)
-            elif batch_size > 1:
+            elif batch_size > 1 and len(entries) > 1:
                 # Retry with a single entry in case it fails due to missing donation mode
                 batch_size = 1
             else:
