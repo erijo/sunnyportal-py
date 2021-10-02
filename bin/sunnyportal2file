@@ -47,12 +47,11 @@ def valid_date_type(arg_date_str):
 
 
 class DataFrameHandler:
-
     def __init__(self, plant, start_date, end_date, format):
         self._plant = plant
         self._plant_name = self._fix_plant_name(plant.name)
         self._file_extension = self._file_extension_dict[format]
-        self._file_name = f"{self._plant_name}.{self._file_extension}" 
+        self._file_name = f"{self._plant_name}.{self._file_extension}"
         self._start_date = start_date
         self._end_date = end_date
         self._old_df = pd.DataFrame()
@@ -65,9 +64,9 @@ class DataFrameHandler:
         "feather": "feather",
         "parquet": "parquet",
         "excel": "xlsx",
-        "sqlite":"db"
+        "sqlite": "db",
     }
-    
+
     # Assuming the power in W is always an integer
     _dtype_dict = {
         "timestamp": np.datetime64,
@@ -86,11 +85,13 @@ class DataFrameHandler:
 
     def download_new_data(self):
         """Extracts data for the period between self._start_date and self._end_date"""
-        
+
         start_date = self._start_date
-        
+
         if start_date > self._end_date:
-            logging.debug(f"start_date {start_date} cannot be larger than end_date {self._end_date}")
+            logging.debug(
+                f"start_date {start_date} cannot be larger than end_date {self._end_date}"
+            )
             self._new_df = pd.DataFrame()
             return
 
@@ -99,42 +100,53 @@ class DataFrameHandler:
         while start_date <= self._end_date:
             res = self._get_power_measurements_for_day(start_date)
             if res:
-                data.append(pd.DataFrame(res)) # The column names will be taken from the namedtuple fields
-            
+                data.append(
+                    pd.DataFrame(res)
+                )  # The column names will be taken from the namedtuple fields
+
             start_date = start_date + timedelta(days=1)
 
         # Concatenate the dataframes, remove columns without values (eg. missing min, max),
         # replace NaN with 0 and rename the columns, reset the index and set the resulting
         # dtypes according to _dtype_dict.
-        translation_dict = {"power": "mean_power", "min":"min_power", "max":"max_power"}
+        translation_dict = {
+            "power": "mean_power",
+            "min": "min_power",
+            "max": "max_power",
+        }
 
-        if(data):
-            df = pd.concat(data).\
-                dropna(axis=1, how='all').\
-                    fillna(0).\
-                        rename(columns=translation_dict).\
-                            reset_index(drop=True)
+        if data:
+            df = (
+                pd.concat(data)
+                .dropna(axis=1, how="all")
+                .fillna(0)
+                .rename(columns=translation_dict)
+                .reset_index(drop=True)
+            )
 
             self._new_df = df.astype({k: self._dtype_dict[k] for k in df.columns})
 
         else:
-            logging.debug(f"No data found between {self._start_date} and {self._end_date}")
+            logging.debug(
+                f"No data found between {self._start_date} and {self._end_date}"
+            )
             self._new_df = pd.DataFrame()
 
     def prepare(self):
         """Reads old data, if needed, and sets new start date accordingly.
         Some subclasses of DataFrameHandler might need to override this method."""
-        
 
         if os.path.isfile(self._file_name):
             logging.debug(f"Reading old dataframe from file {self._file_name}")
             self._old_df = self._read_df()
 
             old_end_date = np.amax(self._old_df["timestamp"]).date()
-            
+
             if old_end_date > self._start_date:
                 self._start_date = old_end_date + timedelta(days=1)
-                logging.debug(f"New start_date {self._start_date} was extracted from file {self._file_name}")
+                logging.debug(
+                    f"New start_date {self._start_date} was extracted from file {self._file_name}"
+                )
 
     def _fix_plant_name(self, old_plant_name):
         """Replaces potentially illegal characters in name with underscore (assumes worst case OS)"""
@@ -142,16 +154,20 @@ class DataFrameHandler:
         plant_name = re.sub(replace_pattern, "_", old_plant_name)
 
         if plant_name != old_plant_name:
-            logging.info(f"Plant name '{old_plant_name}' was converted to '{plant_name}'")
+            logging.info(
+                f"Plant name '{old_plant_name}' was converted to '{plant_name}'"
+            )
         return plant_name
 
     def _merge_dataframes(self):
         """Combines old and new data, if applicable"""
 
-        if ((not self._old_df.empty) & (not self._new_df.empty)):
+        if (not self._old_df.empty) & (not self._new_df.empty):
             logging.debug(f"Merging old and new data")
-            self._df = pd.concat([self._old_df, self._new_df], axis=0).reset_index(drop=True) #.sort_values('timestamp', ignore_index=True)
-        elif (not self._new_df.empty):
+            self._df = pd.concat([self._old_df, self._new_df], axis=0).reset_index(
+                drop=True
+            )  # .sort_values('timestamp', ignore_index=True)
+        elif not self._new_df.empty:
             logging.debug(f"Only new data, no need to merge")
             self._df = self._new_df
         else:
@@ -173,13 +189,13 @@ class DataFrameHandler:
             logging.debug("Empty DataFrame. Nothing to save...")
             return
 
-        
         logging.info(f"Saving to file {self._file_name}")
         self._write_df()
 
+
 class PickleHandler(DataFrameHandler):
     def __init__(self, plant, start_date, end_date):
-        super().__init__(plant, start_date, end_date, format='pickle')
+        super().__init__(plant, start_date, end_date, format="pickle")
         self.kwargs = {}
 
     def _read_df(self):
@@ -188,32 +204,37 @@ class PickleHandler(DataFrameHandler):
     def _write_df(self):
         self._df.to_pickle(self._file_name, **self.kwargs)
 
+
 class JSONHandler(DataFrameHandler):
     def __init__(self, plant, start_date, end_date):
-        super().__init__(plant, start_date, end_date, format='json')
+        super().__init__(plant, start_date, end_date, format="json")
         # Change json format below
         self.kwargs = {"orient": "table"}
 
     def _read_df(self):
-        return self._set_dtype(pd.read_json(self._file_name,**self.kwargs))
+        return self._set_dtype(pd.read_json(self._file_name, **self.kwargs))
 
     def _write_df(self):
         self._df.to_json(self._file_name, index=False, **self.kwargs)
 
+
 class CSVHandler(DataFrameHandler):
     def __init__(self, plant, start_date, end_date):
-        super().__init__(plant, start_date, end_date, format='csv')
+        super().__init__(plant, start_date, end_date, format="csv")
         self.kwargs = {}
 
     def _read_df(self):
-        return self._set_dtype(pd.read_csv(self._file_name, parse_dates=["timestamp"], **self.kwargs))
+        return self._set_dtype(
+            pd.read_csv(self._file_name, parse_dates=["timestamp"], **self.kwargs)
+        )
 
     def _write_df(self):
         self._df.to_csv(self._file_name, index=False, **self.kwargs)
 
+
 class ParquetHandler(DataFrameHandler):
     def __init__(self, plant, start_date, end_date):
-        super().__init__(plant, start_date, end_date, format='parquet')
+        super().__init__(plant, start_date, end_date, format="parquet")
         self.kwargs = {}
 
     def _read_df(self):
@@ -222,42 +243,53 @@ class ParquetHandler(DataFrameHandler):
     def _write_df(self):
         self._df.to_parquet(self._file_name, **self.kwargs)
 
+
 class SQLiteHandler(DataFrameHandler):
     def __init__(self, plant, start_date, end_date):
         import sqlite3
 
-        super().__init__(plant, start_date, end_date, format='sqlite')
-        self._file_name = 'sunny_portal.db'
+        super().__init__(plant, start_date, end_date, format="sqlite")
+        self._file_name = "sunny_portal.db"
         self._conn = sqlite3.connect(self._file_name)
         self._c = self._conn.cursor()
 
     def __table_exists(self):
-        return self._c.execute(f'''SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{self._plant_name}' ''').fetchone()[0]
+        return self._c.execute(
+            f"""SELECT count(name) FROM sqlite_master WHERE type='table' AND name='{self._plant_name}' """
+        ).fetchone()[0]
 
     def prepare(self):
         """No need to read the old data as dataframe in SQL. Just extract the latest date"""
-        
+
         if os.path.isfile(self._file_name) & self.__table_exists():
             logging.debug(f"Extracting latest date from database {self._file_name}")
-            old_end_date = datetime.strptime(\
-                self._conn.execute(\
-                    f'SELECT MAX(timestamp) FROM "{self._plant_name}"').fetchone()[0], "%Y-%m-%d %H:%M:%S").date()
-            
+            old_end_date = datetime.strptime(
+                self._conn.execute(
+                    f'SELECT MAX(timestamp) FROM "{self._plant_name}"'
+                ).fetchone()[0],
+                "%Y-%m-%d %H:%M:%S",
+            ).date()
 
             if old_end_date > self._start_date:
                 self._start_date = old_end_date + timedelta(days=1)
-                logging.debug(\
-                    f"New start_date {self._start_date} was extracted from file {self._file_name} and table {self._plant_name}")
+                logging.debug(
+                    f"New start_date {self._start_date} was extracted from file {self._file_name} and table {self._plant_name}"
+                )
 
     def _read_df(self):
-        return self._set_dtype(pd.read_sql(f'SELECT * FROM {self._plant_name}', con=self._conn))
+        return self._set_dtype(
+            pd.read_sql(f"SELECT * FROM {self._plant_name}", con=self._conn)
+        )
 
     def _write_df(self):
-        self._df.to_sql(self._plant_name, con=self._conn, index=False, if_exists='append')
+        self._df.to_sql(
+            self._plant_name, con=self._conn, index=False, if_exists="append"
+        )
+
 
 class FeatherHandler(DataFrameHandler):
     def __init__(self, plant, start_date, end_date):
-        super().__init__(plant, start_date, end_date, format='feather')
+        super().__init__(plant, start_date, end_date, format="feather")
         self.kwargs = {}
 
     def _read_df(self):
@@ -266,9 +298,10 @@ class FeatherHandler(DataFrameHandler):
     def _write_df(self):
         self._df.to_feather(self._file_name, **self.kwargs)
 
+
 class ExcelHandler(DataFrameHandler):
     def __init__(self, plant, start_date, end_date):
-        super().__init__(plant, start_date, end_date, format='excel')
+        super().__init__(plant, start_date, end_date, format="excel")
         self.kwargs = {}
 
     def _read_df(self):
@@ -277,6 +310,7 @@ class ExcelHandler(DataFrameHandler):
     def _write_df(self):
         self._df.to_excel(self._file_name, index=False, **self.kwargs)
 
+
 df_Handler_dict = {
     "json": JSONHandler,
     "pickle": PickleHandler,
@@ -284,7 +318,7 @@ df_Handler_dict = {
     "feather": FeatherHandler,
     "parquet": ParquetHandler,
     "excel": ExcelHandler,
-    "sqlite":SQLiteHandler
+    "sqlite": SQLiteHandler,
 }
 
 
@@ -293,6 +327,7 @@ def get_df_handler(plant, format, start_date, end_date):
     logging.debug(f"Initialized {df_handler.__class__.__name__} object")
 
     return df_handler
+
 
 def main():
     logging.basicConfig(
@@ -333,7 +368,7 @@ def main():
         "-i",
         "--include-filter",
         type=str,
-        default='',
+        default="",
         required=False,
         help="A string used to filter which plants to include (default includes all plants)",
     )
@@ -366,9 +401,11 @@ def main():
     )
 
     for plant in client.get_plants():
-        if(plant.name.startswith(args.include_filter)):
+        if plant.name.startswith(args.include_filter):
 
-            df_handler = get_df_handler(plant, args.format, args.start_date, args.end_date)
+            df_handler = get_df_handler(
+                plant, args.format, args.start_date, args.end_date
+            )
 
             # Prepare the df_handler where start date might be adjusted if
             # data already exists. For some formats, old data will be read.
@@ -380,7 +417,9 @@ def main():
             # Save the data to file/databse
             df_handler.save_data()
         else:
-            logging.debug(f'Plant {plant.name} does not match include filter "{args.include_filter}"')
+            logging.debug(
+                f'Plant {plant.name} does not match include filter "{args.include_filter}"'
+            )
     client.logout()
 
 

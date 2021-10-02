@@ -49,7 +49,9 @@ Parameter = namedtuple("Parameter", ["value", "changed"])
 Consumption = namedtuple("Consumption", ["external", "internal", "direct"])
 Generation = namedtuple("Generation", ["total", "self_consumption", "feed_in"])
 Battery = namedtuple("Battery", ["charge", "discharge"])
-EnergyBalance = namedtuple("EnergyBalance", ["timestamp", "consumption", "generation", "battery"])
+EnergyBalance = namedtuple(
+    "EnergyBalance", ["timestamp", "consumption", "generation", "battery"]
+)
 
 
 class ResponseBase(object):
