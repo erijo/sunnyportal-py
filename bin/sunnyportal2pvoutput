@@ -17,7 +17,7 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from getpass import getpass
 
 import argparse
@@ -25,7 +25,8 @@ import configparser
 import http.client as http
 import logging
 import sys
-import sunnyportal.client, sunnyportal.responses
+import sunnyportal.client
+import sunnyportal.responses
 import time
 import urllib.parse
 
@@ -66,7 +67,8 @@ class PvOutput(object):
         }
         if power is not None:
             params["v2"] = power
-        (status, reason, body) = self.send_request("/service/r2/addstatus.jsp", params)
+        (status, reason, body) = \
+            self.send_request("/service/r2/addstatus.jsp", params)
         if status != http.OK:
             logging.error("Failed to add status: %s", body)
             raise Exception("could not add status")
@@ -86,7 +88,7 @@ class PvOutput(object):
             )
         offset = 0
         while offset < len(data):
-            entries = data[offset : offset + 30]
+            entries = data[offset: offset + 30]
             (status, reason, body) = self.send_request(
                 "/service/r2/addbatchstatus.jsp", {"data": ";".join(entries)}
             )
@@ -104,7 +106,7 @@ class PvOutput(object):
         offset = 0
         batch_size = 100
         while offset < len(data):
-            entries = data[offset : offset + batch_size]
+            entries = data[offset: offset + batch_size]
             (status, reason, body) = self.send_request(
                 "/service/r2/addoutput.jsp", {"data": ";".join(entries)}
             )
@@ -151,7 +153,8 @@ def get_data_for_day(plant, date, get_consumption):
     return ",".join(str(d) for d in data).rstrip(",")
 
 
-def get_data_for_period(plant, start_date=None, end_date=None, get_consumption=False):
+def get_data_for_period(plant, start_date=None, end_date=None,
+                        get_consumption=False):
     if start_date is None:
         start_date = plant.all_data("year").start_timestamp.date()
     if end_date is None:
@@ -169,7 +172,8 @@ def get_data_for_period(plant, start_date=None, end_date=None, get_consumption=F
 def check_positive(value):
     ivalue = int(value)
     if ivalue <= 0:
-        raise argparse.ArgumentTypeError("%s is an invalid positive int value" % value)
+        raise argparse.ArgumentTypeError(
+            "%s is an invalid positive int value" % value)
     return ivalue
 
 
@@ -178,21 +182,25 @@ def main():
         format="%(asctime)s %(levelname)s: %(message)s", level=logging.DEBUG
     )
 
-    parser = argparse.ArgumentParser(description="Connect Sunny Portal to PVoutput.org")
+    parser = argparse.ArgumentParser(
+        description="Connect Sunny Portal to PVoutput.org")
     parser.add_argument("config", help="Configuration file to use")
-    parser.add_argument("-s", "--status", help="Report status(es)", action="store_true")
-    parser.add_argument("-o", "--output", help="Report output(s)", action="store_true")
+    parser.add_argument("-s", "--status", help="Report status(es)",
+                        action="store_true")
+    parser.add_argument("-o", "--output", help="Report output(s)",
+                        action="store_true")
     parser.add_argument(
         "-c", "--consumption", help="Report consumption", action="store_true"
     )
     parser.add_argument(
         "-p",
         "--days-past",
-        help="number of DAYS in the past to go back -- default: 0 (today only)",
+        help="number of DAYS in the past to go back. Default: 0 (today only)",
         type=check_positive,
         default=0,
     )
-    parser.add_argument("-q", "--quiet", help="Silence output", action="store_true")
+    parser.add_argument("-q", "--quiet", help="Silence output",
+                        action="store_true")
     parser.add_argument(
         "-n", "--dry-run", help="Don't send any data", action="store_true"
     )
@@ -254,7 +262,8 @@ def main():
         sys.exit(1)
 
     pvoutput = PvOutput(
-        config["pvoutput"]["apikey"], config["pvoutput"]["systemid"], args.dry_run
+        config["pvoutput"]["apikey"], config["pvoutput"]["systemid"],
+        args.dry_run
     )
 
     if args.status:
