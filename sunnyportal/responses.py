@@ -48,7 +48,10 @@ Power = namedtuple("Power", ["timestamp", "power", "min", "max"])
 Parameter = namedtuple("Parameter", ["value", "changed"])
 Consumption = namedtuple("Consumption", ["external", "internal", "direct"])
 Generation = namedtuple("Generation", ["total", "self_consumption", "feed_in"])
-EnergyBalance = namedtuple("EnergyBalance", ["timestamp", "consumption", "generation"])
+Battery = namedtuple("Battery", ["charge", "discharge"])
+EnergyBalance = namedtuple(
+    "EnergyBalance", ["timestamp", "consumption", "generation", "battery"]
+)
 
 
 class ResponseBase(object):
@@ -395,7 +398,14 @@ class EnergyBalanceResponse(DataResponse):
         if any(m is None for m in generation):
             return None
 
-        return EnergyBalance(timestamp, consumption, generation)
+        battery = Battery(
+            converter(entry.get("battery-charging")),
+            converter(entry.get("battery-discharging")),
+        )
+        if all(m is None for m in battery):
+            battery = None
+
+        return EnergyBalance(timestamp, consumption, generation, battery)
 
 
 class LogbookResponse(ResponseBase):

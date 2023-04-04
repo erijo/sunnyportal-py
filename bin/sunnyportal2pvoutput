@@ -104,10 +104,11 @@ class PvOutput(object):
 
     def add_batch_output(self, data):
         offset = 0
+        batch_size = 100
         while offset < len(data):
-            entries = data[offset: offset + 30]
+            entries = data[offset: offset + batch_size]
             (status, reason, body) = self.send_request(
-                "/service/r2/addbatchoutput.jsp", {"data": ";".join(entries)}
+                "/service/r2/addoutput.jsp", {"data": ";".join(entries)}
             )
             if status == http.OK:
                 offset += len(entries)
@@ -115,6 +116,9 @@ class PvOutput(object):
                     time.sleep(10)
             elif status == http.BAD_REQUEST and "Load in progress" in body:
                 time.sleep(20)
+            elif batch_size > 1 and len(entries) > 1:
+                # Retry with a single entry in case it fails due to missing donation mode
+                batch_size = 1
             else:
                 logging.error("Failed to add output batch: %s", body)
                 raise Exception("could not add output batch")
@@ -125,7 +129,7 @@ def get_data_for_day(plant, date, get_consumption):
     if day.difference is None:
         return None
 
-    data = ["" for _ in range(11)]
+    data = ["" for _ in range(14)]
     data[0] = day.date.strftime("%Y%m%d")
     data[1] = day.difference
 
@@ -136,15 +140,15 @@ def get_data_for_day(plant, date, get_consumption):
             peak = measure
 
     if peak.timestamp is not None:
-        data[4] = peak.power
-        data[5] = peak.timestamp.strftime("%H:%M")
+        data[3] = peak.power
+        data[4] = peak.timestamp.strftime("%H:%M")
 
     if get_consumption:
         balance = plant.day_energy_balance(date).day
         data[2] = balance.generation.feed_in
-        data[3] = balance.consumption.external + balance.consumption.internal
+        data[13] = balance.consumption.external + balance.consumption.internal
         # All import as "Import Peak"
-        data[10] = balance.consumption.external
+        data[9] = balance.consumption.external
 
     return ",".join(str(d) for d in data).rstrip(",")
 
